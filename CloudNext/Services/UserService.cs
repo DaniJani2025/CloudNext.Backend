@@ -55,6 +55,7 @@ namespace CloudNext.Services
                 return null; // User already exists
 
             var registrationToken = JwtTokenHelper.GenerateRegistrationToken(email, _configuration);
+            var verificationURL = RegistrationUrlGenerator.GenerateRegistrationUrl(email, _configuration);
 
             var newUser = new User
             {
@@ -67,7 +68,7 @@ namespace CloudNext.Services
 
             await _userRepository.AddUserAsync(newUser);
 
-            await _smtpService.SendRegistrationMailAsync(email, registrationToken);
+            await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 
             return newUser;
         }
