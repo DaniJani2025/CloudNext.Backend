@@ -1,0 +1,17 @@
+﻿namespace CloudNext.Models
+{
+    public class User : BaseEntity
+    {
+        public string Email { get; set; } = string.Empty;
+        public string PasswordHash { get; set; } = string.Empty;
+
+        public List<UserFolder> Folders { get; set; } = new();
+        public List<UserFile> Files { get; set; } = new();
+
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
+
+        public string? RegistrationToken { get; set; }
+        public bool IsVerified { get; set; } = false;
+    }
+}
