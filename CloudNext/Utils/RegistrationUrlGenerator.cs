@@ -10,7 +10,7 @@ namespace CloudNext.Utils
             string baseUrl = configuration["AppSettings:RegistrationBaseUrl"]
                 ?? throw new InvalidOperationException("Registration base URL is not configured.");
 
-            return $"{baseUrl}/api/users//register?token={token}";
+            return $"{baseUrl}/api/users/verify?token={token}";
         }
     }
 }

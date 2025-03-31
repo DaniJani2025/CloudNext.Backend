@@ -26,9 +26,8 @@ namespace CloudNext.Utils
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email)
             };
 
             var token = new JwtSecurityToken(
@@ -49,8 +48,8 @@ namespace CloudNext.Utils
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()) // Unique identifier for refresh token
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.SerialNumber, Guid.NewGuid().ToString())
             };
 
             var refreshToken = new JwtSecurityToken(
@@ -71,8 +70,8 @@ namespace CloudNext.Utils
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Email, email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.SerialNumber, Guid.NewGuid().ToString())
             };
 
             var token = new JwtSecurityToken(
@@ -84,6 +83,33 @@ namespace CloudNext.Utils
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public static string ValidateRegistrationToken(string token, IConfiguration configuration)
+        {
+            var key = GetSecurityKey(configuration);
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    RequireExpirationTime = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
+                return principal.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
+            }
+            catch
+            {
+                return null!;
+            }
         }
     }
 }

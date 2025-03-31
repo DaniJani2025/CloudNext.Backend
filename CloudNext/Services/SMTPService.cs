@@ -17,11 +17,11 @@ namespace CloudNext.Services
 
         public SMTPService(IConfiguration configuration)
         {
-            _host = configuration["SmtpClient:Host"];
-            _port = Convert.ToInt32(configuration["SmtpClient:Port"]);
-            _username = configuration["SmtpClient:Username"];
-            _password = configuration["SmtpClient:Password"];
-            _appName = configuration["SmtpClient:ApplicationName"];
+            _host = configuration["SmtpClient:Host"]!;
+            _port = Convert.ToInt32(configuration["SmtpClient:Port"])!;
+            _username = configuration["SmtpClient:Username"]!;
+            _password = configuration["SmtpClient:Password"]!;
+            _appName = configuration["SmtpClient:ApplicationName"]!;
             _enableEmail = true;
         }
 

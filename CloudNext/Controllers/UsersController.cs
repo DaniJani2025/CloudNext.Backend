@@ -19,10 +19,10 @@ namespace CloudNext.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            var (user, token) = await _userService.AuthenticateUserAsync(request.Email, request.Password);
+            var (user, token, message) = await _userService.AuthenticateUserAsync(request.Email, request.Password);
 
             if (user == null)
-                return Unauthorized(ApiResponse<LoginResponseDto>.ErrorResponse("Invalid email or password"));
+                return Unauthorized(ApiResponse<LoginResponseDto>.ErrorResponse(message));
 
             var response = new LoginResponseDto
             {
@@ -51,6 +51,17 @@ namespace CloudNext.Controllers
             };
 
             return Ok(ApiResponse<RegisterResponseDto>.SuccessResponse(response));
+        }
+
+        [HttpGet("verify")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+        {
+            var result = await _userService.VerifyEmailAsync(token);
+
+            if (!result)
+                return BadRequest(ApiResponse<string>.ErrorResponse("Invalid or expired token"));
+
+            return Ok(ApiResponse<string>.SuccessResponse("Email verified successfully"));
         }
     }
 }

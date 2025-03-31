@@ -23,11 +23,14 @@ namespace CloudNext.Services
             _smtpService = smtpService;
         }
 
-        public async Task<(User?, string Token)> AuthenticateUserAsync(string email, string password)
+        public async Task<(User?, string Token, string Message)> AuthenticateUserAsync(string email, string password)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
             if (user == null || !VerifyPassword(password, user.PasswordHash))
-                return (null, string.Empty);
+                return (null, string.Empty, "Invalid email or password");
+
+            if (!user.IsVerified)
+                return (null, string.Empty, "User is not verified yet");
 
             var token = JwtTokenHelper.GenerateJwtToken(user, _configuration);
             var refreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
@@ -36,7 +39,6 @@ namespace CloudNext.Services
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _userRepository.UpdateUserAsync(user);
 
-            // Store refresh token in a secure HTTP-only cookie
             var httpContext = _httpContextAccessor.HttpContext;
             httpContext?.Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
             {
@@ -46,13 +48,13 @@ namespace CloudNext.Services
                 Expires = DateTime.UtcNow.AddDays(7)
             });
 
-            return (user, token);
+            return (user, token, "Login successful");
         }
 
         public async Task<User?> RegisterUserAsync(string email, string password)
         {
             if (await _userRepository.GetUserByEmailAsync(email) != null)
-                return null; // User already exists
+                return null;
 
             var registrationToken = JwtTokenHelper.GenerateRegistrationToken(email, _configuration);
             var verificationURL = RegistrationUrlGenerator.GenerateRegistrationUrl(email, _configuration);
@@ -63,7 +65,7 @@ namespace CloudNext.Services
                 Email = email,
                 PasswordHash = HashPassword(password),
                 RegistrationToken = registrationToken,
-                IsVerified = false // Not verified yet
+                IsVerified = false
             };
 
             await _userRepository.AddUserAsync(newUser);
@@ -73,6 +75,22 @@ namespace CloudNext.Services
             return newUser;
         }
 
+        public async Task<bool> VerifyEmailAsync(string token)
+        {
+            var email = JwtTokenHelper.ValidateRegistrationToken(token, _configuration);
+            if (string.IsNullOrEmpty(email))
+                return false;
+
+            var user = await _userRepository.GetUserByEmailAsync(email);
+
+            if (user == null || user.IsVerified)
+                return false;
+
+            user.IsVerified = true;
+            await _userRepository.UpdateUserAsync(user);
+
+            return true;
+        }
 
         public async Task<bool> UpdateUserEmailAsync(Guid userId, string newEmail)
         {
