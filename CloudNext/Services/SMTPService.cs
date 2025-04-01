@@ -33,7 +33,12 @@ namespace CloudNext.Services
             {
                 try
                 {
-                    string emailBody = $"<p>Click the link below to verify your email:</p><a href='{verificationUrl}'>Verify Email</a>";
+                    string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates", "verification_url_mail_templace.html");
+                    string htmlTemplate = await File.ReadAllTextAsync(templatePath);
+
+                    string emailBody = htmlTemplate
+                        .Replace("{{verificationUrl}}", verificationUrl)
+                        .Replace("{{year}}", DateTime.Now.Year.ToString());
 
                     using SmtpClient smtpClient = new(_host, _port)
                     {
@@ -69,7 +74,7 @@ namespace CloudNext.Services
             {
                 try
                 {
-                    string templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "otp_mail_template.html");
+                    string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates", "otp_mail_template.html");
                     string htmlTemplate = await File.ReadAllTextAsync(templatePath);
 
                     string emailBody = htmlTemplate
@@ -110,7 +115,7 @@ namespace CloudNext.Services
             {
                 try
                 {
-                    string templatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "welcome_mail_template.html");
+                    string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates", "welcome_mail_template.html");
                     string htmlTemplate = await File.ReadAllTextAsync(templatePath);
 
                     using SmtpClient smtpClient = new(_host, _port)
