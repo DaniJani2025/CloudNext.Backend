@@ -22,9 +22,8 @@ namespace CloudNext.Utils
 
         public static string GenerateEncryptionKey(IConfiguration configuration)
         {
-            using var rng = new RNGCryptoServiceProvider();
             byte[] keyBytes = new byte[_keySize];
-            rng.GetBytes(keyBytes);
+            RandomNumberGenerator.Fill(keyBytes);
             return Convert.ToHexString(keyBytes);
         }
 
