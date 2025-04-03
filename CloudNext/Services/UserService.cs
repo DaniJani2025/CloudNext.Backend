@@ -57,7 +57,20 @@ namespace CloudNext.Services
                 return null;
 
             var registrationToken = JwtTokenHelper.GenerateRegistrationToken(email, _configuration);
-            var verificationURL = RegistrationUrlGenerator.GenerateRegistrationUrl(email, _configuration);
+            var verificationURL = GeneratorHelper.GenerateRegistrationUrl(email, _configuration);
+
+            var encryptionKey = GeneratorHelper.GenerateEncryptionKey(_configuration);
+
+            Console.WriteLine($"User Key: {encryptionKey}");
+
+            var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
+
+            Console.WriteLine($"Recovery Key: {recoveryKey}");
+
+            var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, GeneratorHelper.DeriveKeyFromPassword(password, _configuration));
+            
+            var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
+            var encryptedRecoveryKey = EncryptionHelper.EncryptData(recoveryKey, rootKey);
 
             var newUser = new User
             {
@@ -65,11 +78,12 @@ namespace CloudNext.Services
                 Email = email,
                 PasswordHash = HashPassword(password),
                 RegistrationToken = registrationToken,
-                IsVerified = false
+                IsVerified = false,
+                EncryptedUserKey = encryptedUserKey,
+                EncryptedRecoveryKey = encryptedRecoveryKey
             };
 
             await _userRepository.AddUserAsync(newUser);
-
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 
             return newUser;

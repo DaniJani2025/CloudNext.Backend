@@ -13,5 +13,8 @@
 
         public string? RegistrationToken { get; set; }
         public bool IsVerified { get; set; } = false;
+
+        public string? EncryptedUserKey { get; set; }
+        public string? EncryptedRecoveryKey { get; set; }
     }
 }
