@@ -22,7 +22,7 @@ namespace CloudNext.Services
             _username = configuration["SmtpClient:Username"]!;
             _password = configuration["SmtpClient:Password"]!;
             _appName = configuration["SmtpClient:ApplicationName"]!;
-            _enableEmail = true;
+            _enableEmail = false;
         }
 
         public async Task SendRegistrationMailAsync(string recipientEmail, string verificationUrl)
