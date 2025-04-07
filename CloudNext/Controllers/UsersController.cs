@@ -1,5 +1,6 @@
 ﻿using CloudNext.DTOs;
 using CloudNext.DTOs.Users;
+using CloudNext.Models;
 using CloudNext.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,6 +63,26 @@ namespace CloudNext.Controllers
                 return BadRequest(ApiResponse<string>.ErrorResponse("Invalid or expired token"));
 
             return Ok(ApiResponse<string>.SuccessResponse("Email verified successfully"));
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken()
+        {
+            var refreshToken = HttpContext.Request.Cookies["refreshToken"];
+            if (string.IsNullOrEmpty(refreshToken))
+                return Unauthorized(ApiResponse<string>.ErrorResponse("No refresh token provided."));
+
+            var (newAccessToken, success, message) = await _userService.RefreshTokensAsync(refreshToken);
+            if (!success || newAccessToken == null)
+                return Unauthorized(ApiResponse<string>.ErrorResponse(message));
+
+            var response = new TokenRefreshResponseDto
+            {
+                Token = newAccessToken,
+                ExpiresAt = DateTime.UtcNow.AddHours(24)
+            };
+
+            return Ok(ApiResponse<TokenRefreshResponseDto>.SuccessResponse(response));
         }
     }
 }

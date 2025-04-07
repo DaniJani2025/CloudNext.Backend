@@ -1,4 +1,5 @@
 using CloudNext.Data;
+using CloudNext.Interfaces;
 using CloudNext.Repositories.Users;
 using CloudNext.Services;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,9 @@ builder.Services.AddDbContext<CloudNextDbContext>(options =>
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IUserSessionService, UserSessionService>();
+builder.Services.AddScoped<UserSessionService>();
+
 
 builder.Services.AddHttpContextAccessor();
 

@@ -16,5 +16,6 @@
 
         public string? EncryptedUserKey { get; set; }
         public string? EncryptedRecoveryKey { get; set; }
+        public string? PasswordSalt { get; set; }
     }
 }

@@ -17,5 +17,25 @@ namespace CloudNext.Utils
 
             return Convert.ToBase64String(aes.IV) + ":" + Convert.ToBase64String(encryptedBytes);
         }
+
+        public static string DecryptData(string encryptedData, string key)
+        {
+            var parts = encryptedData.Split(':');
+            if (parts.Length != 2)
+                throw new FormatException("Invalid encrypted data format.");
+
+            var iv = Convert.FromBase64String(parts[0]);
+            var encryptedBytes = Convert.FromBase64String(parts[1]);
+            var keyBytes = Convert.FromHexString(key);
+
+            using var aes = Aes.Create();
+            aes.Key = keyBytes;
+            aes.IV = iv;
+
+            using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+            var decryptedBytes = decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
+
+            return Encoding.UTF8.GetString(decryptedBytes);
+        }
     }
 }
