@@ -5,22 +5,33 @@ using CloudNext.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
+using System.Security.Cryptography;
+using CloudNext.Interfaces;
+using System.Security.Claims;
 
 namespace CloudNext.Services
 {
     public class UserService
     {
         private readonly IUserRepository _userRepository;
+        private readonly UserSessionService _userSessionService;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly SMTPService _smtpService;
 
-        public UserService(IUserRepository userRepository, IConfiguration configuration, IHttpContextAccessor httpContextAccessor, SMTPService smtpService)
+        public UserService
+        (
+            IUserRepository userRepository, 
+            IConfiguration configuration, 
+            IHttpContextAccessor httpContextAccessor, 
+            SMTPService smtpService,
+            UserSessionService userSessionService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
             _smtpService = smtpService;
+            _userSessionService = userSessionService;
         }
 
         public async Task<(User?, string Token, string Message)> AuthenticateUserAsync(string email, string password)
@@ -31,6 +42,20 @@ namespace CloudNext.Services
 
             if (!user.IsVerified)
                 return (null, string.Empty, "User is not verified yet");
+
+            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, user.PasswordSalt!);
+
+            string decryptedUserKey;
+            try
+            {
+                decryptedUserKey = EncryptionHelper.DecryptData(user.EncryptedUserKey!, derivedKey);
+            }
+            catch
+            {
+                return (null, string.Empty, "Failed to decrypt user encryption key. Invalid password or corrupted data.");
+            }
+
+            _userSessionService.SetEncryptionKey(user.Id, decryptedUserKey);
 
             var token = JwtTokenHelper.GenerateJwtToken(user, _configuration);
             var refreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
@@ -50,39 +75,43 @@ namespace CloudNext.Services
 
             return (user, token, "Login successful");
         }
-
+        
         public async Task<User?> RegisterUserAsync(string email, string password)
         {
             if (await _userRepository.GetUserByEmailAsync(email) != null)
                 return null;
+
+            Guid userId = Guid.NewGuid();
 
             var registrationToken = JwtTokenHelper.GenerateRegistrationToken(email, _configuration);
             var verificationURL = GeneratorHelper.GenerateRegistrationUrl(email, _configuration);
 
             var encryptionKey = GeneratorHelper.GenerateEncryptionKey(_configuration);
 
-            Console.WriteLine($"User Key: {encryptionKey}");
+            var saltBytes = new byte[16];
+            RandomNumberGenerator.Fill(saltBytes);
+            var saltHex = Convert.ToHexString(saltBytes);
+
+            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, saltHex);
+            var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
-
-            Console.WriteLine($"Recovery Key: {recoveryKey}");
-
-            var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, GeneratorHelper.DeriveKeyFromPassword(password, _configuration));
-            
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
             var encryptedRecoveryKey = EncryptionHelper.EncryptData(recoveryKey, rootKey);
 
             var newUser = new User
             {
-                Id = Guid.NewGuid(),
+                Id = userId,
                 Email = email,
                 PasswordHash = HashPassword(password),
                 RegistrationToken = registrationToken,
                 IsVerified = false,
+                PasswordSalt = saltHex,
                 EncryptedUserKey = encryptedUserKey,
                 EncryptedRecoveryKey = encryptedRecoveryKey
             };
 
+            _userSessionService.SetEncryptionKey(userId, encryptionKey);
             await _userRepository.AddUserAsync(newUser);
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 
@@ -104,6 +133,40 @@ namespace CloudNext.Services
             await _userRepository.UpdateUserAsync(user);
 
             return true;
+        }
+
+        public async Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken)
+        {
+            var principal = JwtTokenHelper.ValidateRefreshToken(refreshToken, _configuration);
+            if (principal == null)
+                return (null, false, "Invalid refresh token");
+
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return (null, false, "Invalid token claims");
+
+            var userId = Guid.Parse(userIdClaim.Value);
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime < DateTime.UtcNow)
+                return (null, false, "Refresh token is invalid or expired");
+
+            var newAccessToken = JwtTokenHelper.GenerateJwtToken(user, _configuration);
+            var newRefreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
+
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            await _userRepository.UpdateUserAsync(user);
+
+            var httpContext = _httpContextAccessor.HttpContext;
+            httpContext?.Response.Cookies.Append("refreshToken", newRefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+
+            return (newAccessToken, true, "Tokens refreshed successfully");
         }
 
         public async Task<bool> UpdateUserEmailAsync(Guid userId, string newEmail)

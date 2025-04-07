@@ -46,10 +46,9 @@ namespace CloudNext.Utils
             return new string(keyChars);
         }
 
-        public static string DeriveKeyFromPassword(string password, IConfiguration configuration)
+        public static string DeriveKeyFromPassword(string password, string saltHex)
         {
-            string randomSalt = configuration["Encryption:Salt"]!;
-            byte[] salt = Encoding.UTF8.GetBytes(randomSalt);
+            byte[] salt = Convert.FromHexString(saltHex);
             using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, _iterations, HashAlgorithmName.SHA256);
             return Convert.ToHexString(pbkdf2.GetBytes(_keySize));
         }

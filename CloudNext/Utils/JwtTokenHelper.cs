@@ -111,5 +111,32 @@ namespace CloudNext.Utils
                 return null!;
             }
         }
+
+        public static ClaimsPrincipal? ValidateRefreshToken(string token, IConfiguration configuration)
+        {
+            var key = GetSecurityKey(configuration);
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    RequireExpirationTime = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }
