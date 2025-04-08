@@ -1,6 +1,6 @@
 ﻿using CloudNext.Models;
 
-namespace CloudNext.Services
+namespace CloudNext.Interfaces
 {
     public interface IFileService
     {
