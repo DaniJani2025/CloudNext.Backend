@@ -37,5 +37,21 @@ namespace CloudNext.Utils
 
             return Encoding.UTF8.GetString(decryptedBytes);
         }
+
+        public static byte[] EncryptFileBytes(byte[] fileBytes, string hexKey)
+        {
+            using var aes = Aes.Create();
+            aes.Key = Convert.FromHexString(hexKey);
+            aes.GenerateIV();
+
+            using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+            byte[] encryptedContent = encryptor.TransformFinalBlock(fileBytes, 0, fileBytes.Length);
+
+            byte[] result = new byte[aes.IV.Length + encryptedContent.Length];
+            Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
+            Buffer.BlockCopy(encryptedContent, 0, result, aes.IV.Length, encryptedContent.Length);
+
+            return result;
+        }
     }
 }

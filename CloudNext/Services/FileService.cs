@@ -1,103 +1,54 @@
-//using System;
-//using System.IO;
-//using System.Threading.Tasks;
-//using Microsoft.AspNetCore.Http;
-//using Microsoft.AspNetCore.Mvc;
-//using Webapp.Database;
+using CloudNext.Data;
+using CloudNext.Interfaces;
+using CloudNext.Models;
+using CloudNext.Utils;
+using Microsoft.AspNetCore.Http;
 
+namespace CloudNext.Services
+{
+    public class FileService : IFileService
+    {
+        private readonly CloudNextDbContext _context;
+        private readonly IUserSessionService _userSessionService;
 
-//namespace User_management_system.Utils
-//{
-//    public class FileService
-//    {
-//        private static readonly string _documentsRoot = "Documents";
-//        private readonly DatabaseManager _database = new();
+        public FileService(CloudNextDbContext context, IUserSessionService userSessionService)
+        {
+            _context = context;
+            _userSessionService = userSessionService;
+        }
 
-//        public async Task<(bool Success, string Message)> UploadFileAsync(IFormFile file, int userId, string userFolderPath)
-//        {
-//            if (file == null || file.Length == 0)
-//            {
-//                return (false, "No file provided.");
-//            }
+        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid userId, Guid? folderId = null)
+        {
+            var userKey = _userSessionService.GetEncryptionKey(userId);
+            if (string.IsNullOrEmpty(userKey))
+                throw new InvalidOperationException("Encryption key not found for the user.");
 
-//            if (!Directory.Exists(userFolderPath))
-//            {
-//                Directory.CreateDirectory(userFolderPath);
-//            }
+            var uploadsRoot = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString());
+            Directory.CreateDirectory(uploadsRoot);
 
-//            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-//            var fileName = Path.GetFileName(file.FileName);
-//            string baseFileName = Path.GetFileNameWithoutExtension(fileName);
-//            string fileExtension = Path.GetExtension(fileName).TrimStart('.');
+            var ext = Path.GetExtension(file.FileName);
+            var uniqueName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(file.FileName)}{ext}";
+            var fullPath = Path.Combine(uploadsRoot, uniqueName);
 
-//            // Ensure uniqueness within the same request
-//            int copyIndex = 1;
-//            string newFileName = $"{baseFileName}_{timestamp}.{fileExtension}";
-//            var filePath = Path.Combine(userFolderPath, newFileName);
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            byte[] encryptedData = EncryptionHelper.EncryptFileBytes(memoryStream.ToArray(), userKey);
+            await File.WriteAllBytesAsync(fullPath, encryptedData);
 
-//            while (File.Exists(filePath))  // Prevents overwriting in local storage
-//            {
-//                newFileName = $"{baseFileName}_{timestamp}_copy{copyIndex}.{fileExtension}";
-//                filePath = Path.Combine(userFolderPath, newFileName);
-//                copyIndex++;
-//            }
+            var userFile = new UserFile
+            {
+                Name = file.FileName,
+                FilePath = Path.Combine("Documents", userId.ToString(), uniqueName).Replace("\\", "/"),
+                Size = file.Length,
+                ContentType = file.ContentType,
+                UserId = userId,
+                FolderId = folderId
+            };
 
-//            bool filePathSaved = _database.StoreFilePath(userId, newFileName, fileExtension, timestamp);
+            _context.UserFiles.Add(userFile);
+            await _context.SaveChangesAsync();
 
-//            if (!filePathSaved)
-//            {
-//                Console.WriteLine("File Path not Saved");
-//            }
-
-//            try
-//            {
-//                using (var fileStream = new FileStream(filePath, FileMode.Create))
-//                {
-//                    await file.CopyToAsync(fileStream);
-//                }
-
-//                return (true, "File uploaded successfully.");
-//            }
-//            catch (Exception ex)
-//            {
-//                return (false, $"An error occurred while uploading the file: {ex.Message}");
-//            }
-//        }
-
-//        public List<string> GetUserFiles(int userId)
-//        {
-//            string userFolderPath = _database.FetchUserFolderPath(userId);
-//            string fullPath = Path.Combine(_documentsRoot, userFolderPath);
-
-//            var files = Directory.GetFiles(fullPath);
-//            var fileNames = new List<string>();
-
-//            foreach (var file in files)
-//            {
-//                fileNames.Add(Path.GetFileName(file));
-//            }
-
-//            return fileNames;
-//        }
-
-//        public string CreateUserFolder(string folderName)
-//        {
-//            // Ensure the Documents directory exists
-//            if (!Directory.Exists(_documentsRoot))
-//            {
-//                Directory.CreateDirectory(_documentsRoot);
-//            }
-
-//            // Create the full path for the user's folder
-//            var userFolderPath = Path.Combine(_documentsRoot, folderName);
-
-//            // Check if the folder already exists
-//            if (!Directory.Exists(userFolderPath))
-//            {
-//                Directory.CreateDirectory(userFolderPath);
-//            }
-
-//            return userFolderPath; // Return the created folder path
-//        }
-//    }
-//}
+            return userFile;
+        }
+    }
+}
