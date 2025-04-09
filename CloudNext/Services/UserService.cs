@@ -14,20 +14,24 @@ namespace CloudNext.Services
     public class UserService
     {
         private readonly IUserRepository _userRepository;
-        private readonly UserSessionService _userSessionService;
+        private readonly IUserFolderRepository _userFolderRepository;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly SMTPService _smtpService;
+        private readonly UserSessionService _userSessionService;
 
         public UserService
         (
-            IUserRepository userRepository, 
-            IConfiguration configuration, 
-            IHttpContextAccessor httpContextAccessor, 
+            IUserRepository userRepository,
+            IUserFolderRepository userFolderRepository,
+            IConfiguration configuration,
+            IHttpContextAccessor httpContextAccessor,
             SMTPService smtpService,
-            UserSessionService userSessionService)
+            UserSessionService userSessionService
+        )
         {
             _userRepository = userRepository;
+            _userFolderRepository = userFolderRepository;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
             _smtpService = smtpService;
@@ -114,6 +118,24 @@ namespace CloudNext.Services
             _userSessionService.SetEncryptionKey(userId, encryptionKey);
             await _userRepository.AddUserAsync(newUser);
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
+
+            var rootFolder = await _userFolderRepository.GetFolderAsync(userId, null, "root");
+
+            if (rootFolder != null)
+                throw new InvalidOperationException("Root folder already exists for this user.");
+
+            var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString());
+            Directory.CreateDirectory(folderPath);
+
+            var newUserFolder = new UserFolder
+            {
+                Name = userId.ToString(),
+                UserId = userId,
+                ParentFolderId = null,
+                RelativePath = ""
+            };
+
+            await _userFolderRepository.AddFolderAsync(newUserFolder);
 
             return newUser;
         }

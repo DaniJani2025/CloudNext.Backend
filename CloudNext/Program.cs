@@ -18,6 +18,8 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<FolderService>();
+builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
 
 
 builder.Services.AddHttpContextAccessor();
