@@ -1,4 +1,5 @@
-﻿using CloudNext.Interfaces;
+﻿using CloudNext.DTOs.UserFiles;
+using CloudNext.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,37 +18,39 @@ namespace CloudNext.Controllers
             _fileService = fileService;
         }
 
-        [HttpPost("upload/{userId}")]
-        public async Task<IActionResult> UploadEncryptedFiles(Guid userId, List<IFormFile> files)
+        [HttpPost("upload")]
+        public async Task<IActionResult> UploadEncryptedFiles(
+            [FromForm] Guid parentFolderId,
+            [FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
 
-            var results = new List<object>();
+            var results = new List<FileUploadResultDto>();
 
             foreach (var file in files)
             {
                 try
                 {
-                    var savedFile = await _fileService.SaveEncryptedFileAsync(file, userId);
-                    results.Add(new
+                    var savedFile = await _fileService.SaveEncryptedFileAsync(file, parentFolderId);
+                    results.Add(new FileUploadResultDto
                     {
-                        FilePath = savedFile.FilePath,
+                        FileId = savedFile.Id,
+                        OriginalName = savedFile.OriginalName,
                         Size = savedFile.Size,
-                        ContentType = savedFile.ContentType,
-                        Name = savedFile.Name
+                        ContentType = savedFile.ContentType
                     });
                 }
                 catch (InvalidOperationException ex)
                 {
-                    results.Add(new { Error = ex.Message, FileName = file.FileName });
+                    return BadRequest(new { Error = ex.Message, FileName = file.FileName });
                 }
             }
 
             return Ok(new
             {
                 Message = "File upload process completed.",
-                UploadedFiles = results
+                Results = results
             });
         }
     }

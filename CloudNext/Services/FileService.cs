@@ -17,32 +17,40 @@ namespace CloudNext.Services
             _userSessionService = userSessionService;
         }
 
-        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid userId, Guid? folderId = null)
+        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid parentFolderId)
         {
+            var parentFolder = await _context.UserFolders.FindAsync(parentFolderId)
+                               ?? throw new InvalidOperationException("Parent folder not found.");
+
+            var userId = parentFolder.UserId;
             var userKey = _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
                 throw new InvalidOperationException("Encryption key not found for the user.");
 
-            var uploadsRoot = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString());
-            Directory.CreateDirectory(uploadsRoot);
+            var folderVirtualPath = parentFolder.VirtualPath;
+            var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
 
-            var ext = Path.GetExtension(file.FileName);
-            var uniqueName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(file.FileName)}{ext}";
-            var fullPath = Path.Combine(uploadsRoot, uniqueName);
+            Directory.CreateDirectory(folderPath);
+
+            var fileId = Guid.NewGuid();
+            var storedFileName = $"{fileId}.dat";
+            var fullPhysicalPath = Path.Combine(folderPath, storedFileName);
 
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
             byte[] encryptedData = EncryptionHelper.EncryptFileBytes(memoryStream.ToArray(), userKey);
-            await File.WriteAllBytesAsync(fullPath, encryptedData);
+            await File.WriteAllBytesAsync(fullPhysicalPath, encryptedData);
 
             var userFile = new UserFile
             {
-                Name = file.FileName,
-                FilePath = Path.Combine("Documents", userId.ToString(), uniqueName).Replace("\\", "/"),
+                Id = fileId,
+                OriginalName = file.FileName,
+                Name = storedFileName,
+                FilePath = Path.Combine("Documents", userId.ToString(), folderVirtualPath, storedFileName).Replace("\\", "/"),
                 Size = file.Length,
                 ContentType = file.ContentType,
                 UserId = userId,
-                FolderId = folderId
+                FolderId = parentFolder.Id
             };
 
             _context.UserFiles.Add(userFile);

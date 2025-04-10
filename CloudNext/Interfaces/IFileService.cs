@@ -4,6 +4,6 @@ namespace CloudNext.Interfaces
 {
     public interface IFileService
     {
-        Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid userId, Guid? folderId = null);
+        Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid parentFolderId);
     }
 }
