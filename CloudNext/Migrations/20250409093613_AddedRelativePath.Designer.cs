@@ -3,6 +3,7 @@ using System;
 using CloudNext.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CloudNext.Migrations
 {
     [DbContext(typeof(CloudNextDbContext))]
-    partial class CloudNextDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250409093613_AddedRelativePath")]
+    partial class AddedRelativePath
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -191,10 +194,6 @@ namespace CloudNext.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("OriginalName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<long>("Size")
                         .HasColumnType("bigint");
 
@@ -229,15 +228,15 @@ namespace CloudNext.Migrations
                     b.Property<Guid?>("ParentFolderId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("VirtualPath")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

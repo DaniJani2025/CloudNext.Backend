@@ -2,6 +2,7 @@
 {
     public class UserFile : BaseEntity
     {
+        public string OriginalName { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
         public long Size { get; set; }
@@ -13,5 +14,4 @@
         public User? User { get; set; }
         public UserFolder? Folder { get; set; }
     }
-
 }
