@@ -132,7 +132,7 @@ namespace CloudNext.Services
                 Name = userId.ToString(),
                 UserId = userId,
                 ParentFolderId = null,
-                RelativePath = ""
+                VirtualPath = ""
             };
 
             await _userFolderRepository.AddFolderAsync(newUserFolder);

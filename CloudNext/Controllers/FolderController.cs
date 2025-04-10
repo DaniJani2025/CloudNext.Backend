@@ -12,7 +12,7 @@ namespace CloudNext.Controllers
     [Authorize]
     public class FolderController : ControllerBase
     {
-        FolderService _folderService;
+        private readonly FolderService _folderService;
 
         public FolderController(FolderService folderService)
         {
@@ -24,11 +24,11 @@ namespace CloudNext.Controllers
         {
             try
             {
-                var results = await _folderService.CreateFolderAsync(dto);
+                var result = await _folderService.CreateFolderAsync(dto);
                 return Ok(new
                 {
                     Message = "Folder created successfully.",
-                    Results = results
+                    Results = result
                 });
             }
             catch (InvalidOperationException ex)

@@ -32,5 +32,11 @@ namespace CloudNext.Repositories.Users
         {
             return await _context.UserFolders.FirstOrDefaultAsync(f => f.Id == folderId);
         }
+
+        public async Task<UserFolder?> GetRootFolderAsync(Guid userId)
+        {
+            return await _context.UserFolders
+                .FirstOrDefaultAsync(f => f.UserId == userId && f.ParentFolderId == null);
+        }
     }
 }

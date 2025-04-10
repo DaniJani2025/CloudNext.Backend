@@ -8,7 +8,7 @@
 
         public User? User { get; set; }
         public UserFolder? ParentFolder { get; set; }
-        public string RelativePath { get; set; } = string.Empty;
+        public string VirtualPath { get; set; } = string.Empty;
         public List<UserFolder> SubFolders { get; set; } = new();
         public List<UserFile> Files { get; set; } = new();
         public List<SharedFolder> SharedWith { get; set; } = new();  // New
