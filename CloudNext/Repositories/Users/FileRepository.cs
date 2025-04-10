@@ -1,5 +1,6 @@
 ﻿using CloudNext.Data;
 using CloudNext.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace CloudNext.Repositories.Users
 {
@@ -17,6 +18,14 @@ namespace CloudNext.Repositories.Users
             _context.UserFiles.Add(file);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<UserFile>> GetFilesByIdsAsync(List<Guid> fileIds)
+        {
+            return await _context.UserFiles
+                .Where(f => fileIds.Contains(f.Id))
+                .ToListAsync();
+        }
+
     }
 
 }

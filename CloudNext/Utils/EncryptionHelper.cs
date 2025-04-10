@@ -53,5 +53,21 @@ namespace CloudNext.Utils
 
             return result;
         }
+
+        public static byte[] DecryptFileBytes(byte[] fileBytes, string hexKey)
+        {
+            var key = Convert.FromHexString(hexKey);
+            var iv = fileBytes.Take(16).ToArray();
+            var encryptedData = fileBytes.Skip(16).ToArray();
+
+            using var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
+
+            using var decryptor = aes.CreateDecryptor();
+            return decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+        }
     }
 }
