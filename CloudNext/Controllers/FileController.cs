@@ -19,9 +19,7 @@ namespace CloudNext.Controllers
         }
 
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadEncryptedFiles(
-            [FromForm] Guid parentFolderId,
-            [FromForm] List<IFormFile> files)
+        public async Task<IActionResult> UploadEncryptedFiles([FromForm] Guid parentFolderId, [FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
@@ -52,6 +50,16 @@ namespace CloudNext.Controllers
                 Message = "File upload process completed.",
                 Results = results
             });
+        }
+
+        [HttpPost("download")]
+        public async Task<IActionResult> DownloadFiles([FromBody] FileDownloadRequestDto request)
+        {
+            if (request.FileIds == null || request.FileIds.Count == 0)
+                return BadRequest("No file IDs provided.");
+
+            var (data, fileName, contentType) = await _fileService.GetDecryptedFilesAsync(request.FileIds, request.UserId);
+            return File(data, contentType, fileName);
         }
     }
 }
