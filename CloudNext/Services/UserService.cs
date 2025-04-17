@@ -59,7 +59,7 @@ namespace CloudNext.Services
                 return (null, string.Empty, "Failed to decrypt user encryption key. Invalid password or corrupted data.");
             }
 
-            _userSessionService.SetEncryptionKey(user.Id, decryptedUserKey);
+            _userSessionService.SetSession(user.Id, decryptedUserKey);
 
             var token = JwtTokenHelper.GenerateJwtToken(user, _configuration);
             var refreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
@@ -115,7 +115,7 @@ namespace CloudNext.Services
                 EncryptedRecoveryKey = encryptedRecoveryKey
             };
 
-            _userSessionService.SetEncryptionKey(userId, encryptionKey);
+            _userSessionService.SetSession(userId, encryptionKey);
             await _userRepository.AddUserAsync(newUser);
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 

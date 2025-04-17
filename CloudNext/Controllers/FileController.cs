@@ -19,10 +19,17 @@ namespace CloudNext.Controllers
         }
 
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadEncryptedFiles([FromForm] Guid parentFolderId, [FromForm] List<IFormFile> files)
+        public async Task<IActionResult> UploadEncryptedFiles(
+            [FromQuery] string? parentFolderId,
+            [FromQuery] Guid userId,
+            [FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
+
+            Guid? folderId = null;
+            if (Guid.TryParse(parentFolderId, out var parsedId))
+                folderId = parsedId;
 
             var results = new List<FileUploadResultDto>();
 
@@ -30,7 +37,7 @@ namespace CloudNext.Controllers
             {
                 try
                 {
-                    var savedFile = await _fileService.SaveEncryptedFileAsync(file, parentFolderId);
+                    var savedFile = await _fileService.SaveEncryptedFileAsync(file, folderId, userId);
                     results.Add(new FileUploadResultDto
                     {
                         FileId = savedFile.Id,

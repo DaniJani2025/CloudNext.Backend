@@ -24,19 +24,28 @@ namespace CloudNext.Services
             _userFolderRepository = userFolderRepository;
         }
 
-        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid parentFolderId)
+        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid? parentFolderId, Guid userId)
         {
-            var parentFolder = await _userFolderRepository.GetFolderByIdAsync(parentFolderId)
-                               ?? throw new InvalidOperationException("Parent folder not found.");
+            UserFolder? parentFolder;
+            string folderVirtualPath;
 
-            var userId = parentFolder.UserId;
+            if (parentFolderId.HasValue)
+            {
+                parentFolder = await _userFolderRepository.GetFolderByIdAsync(parentFolderId.Value)
+                              ?? throw new InvalidOperationException("Parent folder not found.");
+                folderVirtualPath = parentFolder.VirtualPath;
+            }
+            else
+            {
+                parentFolder = null;
+                folderVirtualPath = "";
+            }
+
             var userKey = _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
                 throw new InvalidOperationException("Encryption key not found for the user.");
 
-            var folderVirtualPath = parentFolder.VirtualPath;
             var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
-
             Directory.CreateDirectory(folderPath);
 
             var fileId = Guid.NewGuid();
@@ -57,7 +66,7 @@ namespace CloudNext.Services
                 Size = file.Length,
                 ContentType = file.ContentType,
                 UserId = userId,
-                FolderId = parentFolder.Id
+                FolderId = parentFolder?.Id
             };
 
             await _fileRepository.AddFileAsync(userFile);

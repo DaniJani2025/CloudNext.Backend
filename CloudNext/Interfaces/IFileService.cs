@@ -6,6 +6,6 @@ namespace CloudNext.Interfaces
     public interface IFileService
     {
         Task<(byte[] Data, string FileName, string ContentType)> GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId);
-        Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid parentFolderId);
+        Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid? parentFolderId, Guid userId);
     }
 }
