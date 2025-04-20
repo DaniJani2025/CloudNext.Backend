@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using System.Security.Cryptography;
 using CloudNext.Interfaces;
 using System.Security.Claims;
+using System.Text;
 
 namespace CloudNext.Services
 {
@@ -100,6 +101,11 @@ namespace CloudNext.Services
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
+            Console.WriteLine($"Recovery Key: {recoveryKey}");
+
+            var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
+            var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
+
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
             var encryptedRecoveryKey = EncryptionHelper.EncryptData(recoveryKey, rootKey);
 
@@ -112,7 +118,8 @@ namespace CloudNext.Services
                 IsVerified = false,
                 PasswordSalt = saltHex,
                 EncryptedUserKey = encryptedUserKey,
-                EncryptedRecoveryKey = encryptedRecoveryKey
+                EncryptedRecoveryKey = encryptedRecoveryKey,
+                RecoveryEncryptedUserKey = recoveryEncryptedUserKey
             };
 
             _userSessionService.SetSession(userId, encryptionKey);

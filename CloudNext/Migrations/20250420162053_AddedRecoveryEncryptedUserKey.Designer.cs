@@ -3,6 +3,7 @@ using System;
 using CloudNext.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CloudNext.Migrations
 {
     [DbContext(typeof(CloudNextDbContext))]
-    partial class CloudNextDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250420162053_AddedRecoveryEncryptedUserKey")]
+    partial class AddedRecoveryEncryptedUserKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
