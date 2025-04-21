@@ -26,6 +26,12 @@ namespace CloudNext.Repositories.Users
                 .ToListAsync();
         }
 
+        public async Task<List<UserFile>> GetFilesByFolderIdAsync(Guid folderId)
+        {
+            return await _context.UserFiles
+                .Where(f => f.FolderId == folderId)
+                .ToListAsync();
+        }
     }
 
 }

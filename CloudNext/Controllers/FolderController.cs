@@ -36,5 +36,20 @@ namespace CloudNext.Controllers
                 return BadRequest(new { Error = ex.Message });
             }
         }
+
+        [HttpPost("download")]
+        public async Task<IActionResult> DownloadFolder([FromBody] FolderDownloadRequestDto dto)
+        {
+            try
+            {
+                var zipFileBytes = await _folderService.DownloadFolderAsync(dto.UserId, dto.FolderId);
+
+                return File(zipFileBytes, "application/zip", "folder.zip");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }
