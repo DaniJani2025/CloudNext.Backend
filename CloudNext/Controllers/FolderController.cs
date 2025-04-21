@@ -51,5 +51,19 @@ namespace CloudNext.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPost("upload")]
+        public async Task<IActionResult> UploadFolder([FromForm] FolderUploadDto dto)
+        {
+            try
+            {
+                await _folderService.UploadFolderAsync(dto.UserId, dto);
+                return Ok("Folder uploaded successfully.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

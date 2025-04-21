@@ -89,5 +89,62 @@ namespace CloudNext.Services
             return zipMemoryStream.ToArray();
         }
 
+        public async Task UploadFolderAsync(Guid userId, FolderUploadDto dto)
+        {
+            var parentFolder = await _userFolderRepository.GetFolderByIdAsync(Guid.Parse(dto.ParentFolderId));
+            if (parentFolder == null || parentFolder.UserId != userId)
+                throw new InvalidOperationException("Parent folder not found or access denied.");
+
+            using var zipStream = dto.ZipFile.OpenReadStream();
+            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+            foreach (var entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+
+                var relativePath = Path.GetDirectoryName(entry.FullName)?.Replace("\\", "/") ?? "";
+                var folderNames = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+                Guid currentParentId = parentFolder.Id;
+                string currentVirtualPath = parentFolder.VirtualPath;
+
+                foreach (var folderName in folderNames)
+                {
+                    var existing = await _userFolderRepository.GetFolderAsync(userId, currentParentId, folderName);
+                    if (existing != null)
+                    {
+                        currentParentId = existing.Id;
+                        currentVirtualPath = existing.VirtualPath;
+                    }
+                    else
+                    {
+                        var newFolder = new UserFolder
+                        {
+                            UserId = userId,
+                            ParentFolderId = currentParentId,
+                            Name = folderName,
+                            VirtualPath = Path.Combine(currentVirtualPath, folderName).Replace("\\", "/")
+                        };
+                        await _userFolderRepository.AddFolderAsync(newFolder);
+
+                        currentParentId = newFolder.Id;
+                        currentVirtualPath = newFolder.VirtualPath;
+                    }
+                }
+
+                using var entryStream = entry.Open();
+                using var ms = new MemoryStream();
+                await entryStream.CopyToAsync(ms);
+                ms.Position = 0;
+
+                var formFile = new FormFile(ms, 0, ms.Length, null, entry.Name)
+                {
+                    Headers = new HeaderDictionary(),
+                    ContentType = "application/octet-stream"
+                };
+
+                await _fileService.SaveEncryptedFileAsync(formFile, currentParentId, userId);
+            }
+        }
     }
 }
