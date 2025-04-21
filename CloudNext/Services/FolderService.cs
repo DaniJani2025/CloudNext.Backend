@@ -4,16 +4,21 @@ using CloudNext.Models;
 using CloudNext.Repositories.Users;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
+using System.IO.Compression;
 
 namespace CloudNext.Services
 {
     public class FolderService
     {
         private readonly IUserFolderRepository _userFolderRepository;
+        private readonly IFileRepository _fileRepository;
+        private readonly IFileService _fileService;
 
-        public FolderService(IUserFolderRepository userFolderRepository)
+        public FolderService(IUserFolderRepository userFolderRepository, IFileService fileService, IFileRepository fileRepository)
         {
             _userFolderRepository = userFolderRepository;
+            _fileService = fileService;
+            _fileRepository = fileRepository;
         }
 
         public async Task<FolderResponseDto> CreateFolderAsync(CreateFolderDto dto)
@@ -57,5 +62,32 @@ namespace CloudNext.Services
                 ParentFolderId = newFolder.ParentFolderId
             };
         }
+
+        public async Task<byte[]> DownloadFolderAsync(Guid userId, Guid folderId)
+        {
+            var folder = await _userFolderRepository.GetFolderByIdAsync(folderId);
+            if (folder == null || folder.UserId != userId)
+                throw new InvalidOperationException("Folder not found or access denied.");
+
+            var filesInFolder = await _fileRepository.GetFilesByFolderIdAsync(folderId);
+
+            using var zipMemoryStream = new MemoryStream();
+            using (var archive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
+            {
+                foreach (var file in filesInFolder)
+                {
+                    var (decryptedBytes, originalName, _) = await _fileService.GetDecryptedFilesAsync(new List<Guid> { file.Id }, userId);
+
+                    var entryPath = Path.Combine(folder.Name, originalName).Replace("\\", "/");
+                    var zipEntry = archive.CreateEntry(entryPath, CompressionLevel.Fastest);
+                    using var entryStream = zipEntry.Open();
+                    await entryStream.WriteAsync(decryptedBytes, 0, decryptedBytes.Length);
+                }
+            }
+
+            zipMemoryStream.Position = 0;
+            return zipMemoryStream.ToArray();
+        }
+
     }
 }
