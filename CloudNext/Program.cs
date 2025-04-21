@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5074);
-    // options.ListenAnyIP(7245, listenOptions => listenOptions.UseHttps());
+    //options.ListenAnyIP(7245, listenOptions => listenOptions.UseHttps());
 });
 
 builder.Services.AddDbContext<CloudNextDbContext>(options =>
@@ -102,7 +102,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "CloudNext API v1");
-        c.InjectStylesheet("/swagger-dark.css");
+        //c.InjectStylesheet("/swagger-dark.css");
     });
 }
 
