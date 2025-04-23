@@ -1,5 +1,6 @@
 ﻿using CloudNext.DTOs.UserFiles;
 using CloudNext.Interfaces;
+using CloudNext.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,10 +13,12 @@ namespace CloudNext.Controllers
     public class FileController : ControllerBase
     {
         private readonly IFileService _fileService;
+        private readonly IUserSessionService _userSessionService;
 
-        public FileController(IFileService fileService)
+        public FileController(IFileService fileService, IUserSessionService userSessionService)
         {
             _fileService = fileService;
+            _userSessionService = userSessionService;
         }
 
         [HttpPost("upload")]
@@ -24,6 +27,10 @@ namespace CloudNext.Controllers
             [FromQuery] Guid userId,
             [FromForm] List<IFormFile> files)
         {
+            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            if (encryptionKey == null)
+                return Unauthorized("Session invalid or expired");
+
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
 
@@ -62,6 +69,10 @@ namespace CloudNext.Controllers
         [HttpPost("download")]
         public async Task<IActionResult> DownloadFiles([FromBody] FileDownloadRequestDto request)
         {
+            var encryptionKey = _userSessionService.GetEncryptionKey(request.UserId);
+            if (encryptionKey == null)
+                return Unauthorized("Session invalid or expired");
+
             if (request.FileIds == null || request.FileIds.Count == 0)
                 return BadRequest("No file IDs provided.");
 

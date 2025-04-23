@@ -1,7 +1,9 @@
-﻿using CloudNext.DTOs;
+﻿using System.Security.Claims;
+using CloudNext.DTOs;
 using CloudNext.DTOs.Users;
 using CloudNext.Models;
 using CloudNext.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CloudNext.Controllers
@@ -34,6 +36,23 @@ namespace CloudNext.Controllers
             };
 
             return Ok(ApiResponse<LoginResponseDto>.SuccessResponse(response));
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return Unauthorized(ApiResponse<string>.ErrorResponse("User not authenticated"));
+
+            var userId = Guid.Parse(userIdClaim.Value);
+
+            _userService.Logout(userId);
+
+            Response.Cookies.Delete("refreshToken");
+
+            return Ok(ApiResponse<string>.SuccessResponse("Logged out successfully"));
         }
 
         [HttpPost("register")]
