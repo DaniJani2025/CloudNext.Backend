@@ -54,7 +54,20 @@ namespace CloudNext.Services
 
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
-            byte[] encryptedData = EncryptionHelper.EncryptFileBytes(memoryStream.ToArray(), userKey);
+            byte[] fileBytes = memoryStream.ToArray();
+
+            string contentType = file.ContentType;
+
+            if (contentType.StartsWith("image/") || contentType.StartsWith("video/"))
+            {
+                var thumbnailFolderPath = Path.Combine(folderPath, ".thumbnails");
+                Directory.CreateDirectory(thumbnailFolderPath);
+                var thumbnailPath = Path.Combine(thumbnailFolderPath, $"{fileId}.png");
+
+                GeneratorHelper.GenerateThumbnail(fileBytes, contentType, thumbnailPath);
+            }
+
+            byte[] encryptedData = EncryptionHelper.EncryptFileBytes(fileBytes, userKey);
             await File.WriteAllBytesAsync(fullPhysicalPath, encryptedData);
 
             var userFile = new UserFile
@@ -64,7 +77,7 @@ namespace CloudNext.Services
                 Name = storedFileName,
                 FilePath = Path.Combine("Documents", userId.ToString(), folderVirtualPath, storedFileName).Replace("\\", "/"),
                 Size = file.Length,
-                ContentType = file.ContentType,
+                ContentType = contentType,
                 UserId = userId,
                 FolderId = parentFolder?.Id
             };
