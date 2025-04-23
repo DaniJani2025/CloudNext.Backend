@@ -125,5 +125,55 @@ namespace CloudNext.Services
             memoryStream.Position = 0;
             return (memoryStream.ToArray(), "files.zip", "application/zip");
         }
+
+        public async Task<List<ThumbnailDto>> GetThumbnailsForFolderAsync(Guid? folderId, Guid userId)
+        {
+            string folderVirtualPath;
+            List<UserFile> files;
+
+            if (folderId.HasValue)
+            {
+                var folder = await _userFolderRepository.GetFolderByIdAsync(folderId.Value)
+                             ?? throw new InvalidOperationException("Folder not found.");
+
+                folderVirtualPath = folder.VirtualPath;
+                files = await _fileRepository.GetFilesByFolderIdAsync(folderId.Value);
+            }
+            else
+            {
+                folderVirtualPath = "";
+                files = await _fileRepository.GetFilesInRootAsync(userId);
+            }
+
+            var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
+            var thumbnailFolderPath = Path.Combine(folderPath, ".thumbnails");
+
+            if (!Directory.Exists(thumbnailFolderPath))
+                return new List<ThumbnailDto>();
+
+            var thumbnails = new List<ThumbnailDto>();
+
+            foreach (var file in files)
+            {
+                if (!(file.ContentType.StartsWith("image/") || file.ContentType.StartsWith("video/")))
+                    continue;
+
+                var thumbPath = Path.Combine(thumbnailFolderPath, $"{file.Id}.png");
+                if (!System.IO.File.Exists(thumbPath))
+                    continue;
+
+                var imageBytes = await System.IO.File.ReadAllBytesAsync(thumbPath);
+                var base64 = Convert.ToBase64String(imageBytes);
+
+                thumbnails.Add(new ThumbnailDto
+                {
+                    FileId = file.Id,
+                    OriginalName = file.OriginalName,
+                    Base64Thumbnail = $"data:image/png;base64,{base64}"
+                });
+            }
+
+            return thumbnails;
+        }
     }
 }
