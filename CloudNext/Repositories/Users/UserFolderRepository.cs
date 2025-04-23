@@ -38,5 +38,12 @@ namespace CloudNext.Repositories.Users
             return await _context.UserFolders
                 .FirstOrDefaultAsync(f => f.UserId == userId && f.ParentFolderId == null);
         }
+
+        public async Task<List<UserFolder>> GetFoldersByParentIdAsync(Guid userId, Guid parentId)
+        {
+            return await _context.UserFolders
+                .Where(f => f.UserId == userId && f.ParentFolderId == parentId)
+                .ToListAsync();
+        }
     }
 }

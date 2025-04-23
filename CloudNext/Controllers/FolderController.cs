@@ -65,5 +65,19 @@ namespace CloudNext.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("GetAll")]
+        public async Task<IActionResult> GetAllFolders([FromQuery] Guid userId, [FromQuery] Guid? folderId)
+        {
+            try
+            {
+                var folders = await _folderService.GetFoldersInCurrentDirectoryAsync(userId, folderId);
+                return Ok(folders);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
+        }
     }
 }
