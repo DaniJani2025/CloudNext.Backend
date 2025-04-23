@@ -39,7 +39,6 @@ namespace CloudNext.Repositories.Users
                 .Where(f => f.UserId == userId && f.FolderId == null)
                 .ToListAsync();
         }
-
     }
 
 }
