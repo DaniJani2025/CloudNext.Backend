@@ -16,7 +16,7 @@ namespace CloudNext.Controllers
             _fileService = fileService;
         }
 
-        [HttpGet("{folderId}")]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetFolderThumbnails([FromQuery] Guid? folderId, [FromQuery] Guid userId)
         {
             var thumbnails = await _fileService.GetThumbnailsForFolderAsync(folderId, userId);
