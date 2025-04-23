@@ -146,5 +146,31 @@ namespace CloudNext.Services
                 await _fileService.SaveEncryptedFileAsync(formFile, currentParentId, userId);
             }
         }
+
+        public async Task<List<FolderResponseDto>> GetFoldersInCurrentDirectoryAsync(Guid userId, Guid? folderId)
+        {
+            Guid parentId;
+
+            if (folderId.HasValue)
+            {
+                parentId = folderId.Value;
+            }
+            else
+            {
+                var rootFolder = await _userFolderRepository.GetRootFolderAsync(userId)
+                                 ?? throw new InvalidOperationException("Root folder not found.");
+                parentId = rootFolder.Id;
+            }
+
+            var subFolders = await _userFolderRepository.GetFoldersByParentIdAsync(userId, parentId);
+
+            return subFolders.Select(f => new FolderResponseDto
+            {
+                FolderId = f.Id,
+                Name = f.Name,
+                VirtualPath = f.VirtualPath,
+                ParentFolderId = f.ParentFolderId
+            }).ToList();
+        }
     }
 }
