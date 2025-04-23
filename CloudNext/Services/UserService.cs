@@ -198,6 +198,11 @@ namespace CloudNext.Services
             return (newAccessToken, true, "Tokens refreshed successfully");
         }
 
+        public void Logout(Guid userId)
+        {
+            _userSessionService.RemoveSession(userId);
+        }
+
         public async Task<bool> UpdateUserEmailAsync(Guid userId, string newEmail)
         {
             var user = await _userRepository.GetUserByIdAsync(userId);
