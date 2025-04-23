@@ -19,6 +19,17 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddDbContext<CloudNextDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
@@ -106,6 +117,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors("AllowFrontend");
 //app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
