@@ -15,5 +15,7 @@
                 "image/webp"
             };
         }
+
+        public const long MaxUploadSizeInBytes = 10L * 1024 * 1024 * 1024;
     }
 }

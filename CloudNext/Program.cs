@@ -1,9 +1,11 @@
 using System.Text;
+using CloudNext.Common;
 using CloudNext.Data;
 using CloudNext.Interfaces;
 using CloudNext.Repositories.Users;
 using CloudNext.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -14,6 +16,16 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5074);
     //options.ListenAnyIP(7245, listenOptions => listenOptions.UseHttps());
+});
+
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Limits.MaxRequestBodySize = Constants.MaxUploadSizeInBytes;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = Constants.MaxUploadSizeInBytes;
 });
 
 builder.Services.AddDbContext<CloudNextDbContext>(options =>
