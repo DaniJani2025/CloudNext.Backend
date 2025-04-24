@@ -57,7 +57,6 @@ namespace CloudNext.Services
                     mail.To.Add(recipientEmail);
 
                     await smtpClient.SendMailAsync(mail);
-                    Console.WriteLine($"Verification email sent to {recipientEmail}");
                 }
                 catch (Exception ex)
                 {
@@ -98,7 +97,6 @@ namespace CloudNext.Services
                     mail.To.Add(recipientEmail);
 
                     await smtpClient.SendMailAsync(mail);
-                    Console.WriteLine("OTP sent successfully!");
                 }
                 catch (Exception ex)
                 {
@@ -135,7 +133,6 @@ namespace CloudNext.Services
                     mail.To.Add(email);
 
                     await smtpClient.SendMailAsync(mail);
-                    Console.WriteLine("Welcome message sent successfully!");
                 }
                 catch (Exception ex)
                 {

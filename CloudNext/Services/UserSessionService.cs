@@ -29,15 +29,12 @@ namespace CloudNext.Services
             var context = _httpContextAccessor.HttpContext;
             var currentIp = context?.Connection.RemoteIpAddress?.ToString();
             var currentUserAgent = context?.Request.Headers.UserAgent.ToString();
-
-            Console.WriteLine($"Current session: {currentIp}, {currentUserAgent}");
-
+            
             if (currentIp == null || currentUserAgent == null)
                 return null;
 
             if (_userSessions.TryGetValue(userId, out var session))
             {
-                Console.WriteLine($"User Session: {session.IP}, {session.Agent}");
                 if (session.IP == currentIp && session.Agent == currentUserAgent)
                     return session.Key;
             }

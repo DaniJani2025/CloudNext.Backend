@@ -101,7 +101,6 @@ namespace CloudNext.Services
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
-            Console.WriteLine($"Recovery Key: {recoveryKey}");
 
             var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
             var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
