@@ -172,5 +172,34 @@ namespace CloudNext.Services
                 ParentFolderId = f.ParentFolderId
             }).ToList();
         }
+
+        public async Task<FolderTreeDto> GetFullFolderStructureAsync(Guid userId)
+        {
+            var rootFolder = await _userFolderRepository.GetRootFolderAsync(userId);
+            if (rootFolder == null)
+                throw new InvalidOperationException("Root folder not found.");
+
+            return await BuildFolderTreeAsync(rootFolder);
+        }
+
+        private async Task<FolderTreeDto> BuildFolderTreeAsync(UserFolder folder)
+        {
+            var subFolders = await _userFolderRepository.GetFoldersByParentIdAsync(folder.UserId, folder.Id);
+
+            var subFolderTrees = new List<FolderTreeDto>();
+            foreach (var subFolder in subFolders)
+            {
+                var subTree = await BuildFolderTreeAsync(subFolder);
+                subFolderTrees.Add(subTree);
+            }
+
+            return new FolderTreeDto
+            {
+                FolderId = folder.Id,
+                Name = folder.Name,
+                VirtualPath = folder.VirtualPath,
+                SubFolders = subFolderTrees
+            };
+        }
     }
 }
