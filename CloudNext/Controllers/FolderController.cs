@@ -98,5 +98,23 @@ namespace CloudNext.Controllers
                 return BadRequest(new { Error = ex.Message });
             }
         }
+
+        [HttpGet("structure")]
+        public async Task<IActionResult> GetFullFolderStructure([FromQuery] Guid userId)
+        {
+            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            if (encryptionKey == null)
+                return Unauthorized("Session invalid or expired");
+
+            try
+            {
+                var structure = await _folderService.GetFullFolderStructureAsync(userId);
+                return Ok(structure);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
+        }
     }
 }
