@@ -137,10 +137,14 @@ namespace CloudNext.Services
                 await entryStream.CopyToAsync(ms);
                 ms.Position = 0;
 
+                string detectedContentType = MimeHelper.GetMimeType(entry.Name, ms.ToArray());
+
+                ms.Position = 0;
+
                 var formFile = new FormFile(ms, 0, ms.Length, null, entry.Name)
                 {
                     Headers = new HeaderDictionary(),
-                    ContentType = "application/octet-stream"
+                    ContentType = detectedContentType
                 };
 
                 await _fileService.SaveEncryptedFileAsync(formFile, currentParentId, userId);
@@ -200,6 +204,31 @@ namespace CloudNext.Services
                 VirtualPath = folder.VirtualPath,
                 SubFolders = subFolderTrees
             };
+        }
+
+        public static class MimeHelper
+        {
+            private static readonly Dictionary<string, string> MimeTypes = new()
+            {
+                { ".jpg", "image/jpeg" },
+                { ".jpeg", "image/jpeg" },
+                { ".png", "image/png" },
+                { ".gif", "image/gif" },
+                { ".bmp", "image/bmp" },
+                { ".mp4", "video/mp4" },
+                { ".mov", "video/quicktime" },
+                { ".avi", "video/x-msvideo" },
+                { ".webm", "video/webm" },
+            };
+
+            public static string GetMimeType(string fileName, byte[] fileBytes)
+            {
+                var extension = Path.GetExtension(fileName).ToLowerInvariant();
+                if (MimeTypes.TryGetValue(extension, out var mime))
+                    return mime;
+
+                return "application/octet-stream";
+            }
         }
     }
 }
