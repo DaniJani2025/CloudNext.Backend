@@ -125,6 +125,8 @@ namespace CloudNext.Services
             await _userRepository.AddUserAsync(newUser);
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 
+            Console.WriteLine($"Verification Url: {verificationURL}");
+
             var rootFolder = await _userFolderRepository.GetFolderAsync(userId, null, "root");
 
             if (rootFolder != null)
@@ -146,21 +148,22 @@ namespace CloudNext.Services
             return newUser;
         }
 
-        public async Task<bool> VerifyEmailAsync(string token)
+        public async Task<string?> VerifyEmailAsync(string token)
         {
             var email = JwtTokenHelper.ValidateRegistrationToken(token, _configuration);
             if (string.IsNullOrEmpty(email))
-                return false;
+                return null;
 
             var user = await _userRepository.GetUserByEmailAsync(email);
 
             if (user == null || user.IsVerified)
-                return false;
+                return null;
 
             user.IsVerified = true;
             await _userRepository.UpdateUserAsync(user);
 
-            return true;
+            var ApiBaseUrl = _configuration["AppSettings:AppBaseUrl"];
+            return $"{ApiBaseUrl}/login";
         }
 
         public async Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken)

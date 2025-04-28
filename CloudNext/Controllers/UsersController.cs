@@ -76,12 +76,12 @@ namespace CloudNext.Controllers
         [HttpGet("verify")]
         public async Task<IActionResult> VerifyEmail([FromQuery] string token)
         {
-            var result = await _userService.VerifyEmailAsync(token);
+            var redirectUrl = await _userService.VerifyEmailAsync(token);
 
-            if (!result)
+            if (string.IsNullOrEmpty(redirectUrl))
                 return BadRequest(ApiResponse<string>.ErrorResponse("Invalid or expired token"));
 
-            return Ok(ApiResponse<string>.SuccessResponse("Email verified successfully"));
+            return Redirect(redirectUrl);
         }
 
         [HttpPost("refresh-token")]
