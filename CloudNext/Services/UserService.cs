@@ -80,7 +80,7 @@ namespace CloudNext.Services
 
             return (user, token, "Login successful");
         }
-        
+
         public async Task<User?> RegisterUserAsync(string email, string password)
         {
             if (await _userRepository.GetUserByEmailAsync(email) != null)
@@ -100,10 +100,13 @@ namespace CloudNext.Services
             var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, saltHex);
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
+            // Generate recovery key without hex encoding
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
 
-            var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
-            var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
+            Console.WriteLine($"Recovery key: {recoveryKey}");
+
+            // Encrypt the recovery key directly (no hex encoding)
+            var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(recoveryKey, encryptionKey);
 
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
             var encryptedRecoveryKey = EncryptionHelper.EncryptData(recoveryKey, rootKey);
@@ -210,6 +213,65 @@ namespace CloudNext.Services
             user.Email = newEmail;
             await _userRepository.UpdateUserAsync(user);
             return true;
+        }
+
+        public async Task<string> RequestPasswordResetAsync(string email)
+        {
+            var user = await _userRepository.GetUserByEmailAsync(email);
+            if (user == null)
+                return "User with this email doesn't exist.";
+
+            var resetToken = JwtTokenHelper.GeneratePasswordResetToken(user, _configuration);
+            Console.WriteLine($"Reset Token: {resetToken}");
+            var resetUrl = $"http://localhost:5074/api/Users/reset-password?token={resetToken}";
+
+            await _smtpService.SendPasswordResetMailAsync(email, resetUrl);
+
+            return "Password reset email sent.";
+        }
+
+        public async Task<string> ResetPasswordAsync(string token, string newPassword, string recoveryKey)
+        {
+            // Validate the JWT token and extract user information from it
+            var principal = JwtTokenHelper.ValidateResetPasswordToken(token, _configuration);
+            if (principal == null)
+                return "Invalid or expired reset token.";
+
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return "Invalid token claims.";
+
+            var userId = Guid.Parse(userIdClaim.Value);
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                return "User not found.";
+
+            // Decrypt the recovery key using the root key
+            var decryptedRecoveryKey = EncryptionHelper.DecryptData(user.EncryptedRecoveryKey, _configuration["Security:RootKey"]);
+
+            // Verify that the provided recovery key matches the stored (decrypted) recovery key
+            if (recoveryKey != decryptedRecoveryKey)
+                return "Recovery key is incorrect.";
+
+            // Derive a new encryption key from the new password and user's salt
+            var saltBytes = Convert.FromHexString(user.PasswordSalt);
+            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(newPassword, Convert.ToHexString(saltBytes));
+
+            // Encrypt the new user key (with the derived key) and update it in the user record
+            var encryptedUserKey = EncryptionHelper.EncryptData(user.EncryptedUserKey, derivedKey);
+            user.EncryptedUserKey = encryptedUserKey;
+
+            // Hash the new password and update the password hash
+            user.PasswordHash = HashPassword(newPassword);
+
+            // Optionally, update the salt (if you plan to change the salt as well, but here we keep it the same)
+            user.PasswordSalt = Convert.ToHexString(saltBytes);
+
+            // Save the updated user data
+            await _userRepository.UpdateUserAsync(user);
+
+            // Return a success message after the password reset
+            return "Password reset successfully.";
         }
 
         public async Task<bool> DeleteUserAsync(Guid userId)

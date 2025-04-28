@@ -103,5 +103,30 @@ namespace CloudNext.Controllers
 
             return Ok(ApiResponse<TokenRefreshResponseDto>.SuccessResponse(response));
         }
+
+        [HttpPost("request-password-reset")]
+        public async Task<IActionResult> RequestPasswordReset([FromBody] RequestPasswordResetDto request)
+        {
+            var result = await _userService.RequestPasswordResetAsync(request.Email);
+
+            if (result == "User with this email doesn't exist.")
+                return NotFound(ApiResponse<string>.ErrorResponse(result));
+
+            return Ok(ApiResponse<string>.SuccessResponse(result));
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
+        {
+            var result = await _userService.ResetPasswordAsync(request.Token, request.NewPassword, request.RecoveryKey);
+
+            if (result == "Invalid or expired reset token.")
+                return BadRequest(ApiResponse<string>.ErrorResponse(result));
+
+            if (result == "User not found.")
+                return NotFound(ApiResponse<string>.ErrorResponse(result));
+
+            return Ok(ApiResponse<string>.SuccessResponse(result));
+        }
     }
 }
