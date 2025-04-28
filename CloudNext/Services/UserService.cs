@@ -163,7 +163,7 @@ namespace CloudNext.Services
             await _userRepository.UpdateUserAsync(user);
 
             var ApiBaseUrl = _configuration["AppSettings:AppBaseUrl"];
-            return $"{ApiBaseUrl}/login";
+            return $"{ApiBaseUrl}/verification-complete";
         }
 
         public async Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken)
