@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using CloudNext.Common;
 using CloudNext.Data;
@@ -15,7 +16,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5074);
-    //options.ListenAnyIP(7245, listenOptions => listenOptions.UseHttps());
+    options.ListenAnyIP(7245, listenOptions =>
+    {
+        listenOptions.UseHttps(new X509Certificate2("Certificates/localhost-cert.pfx", "1234"));
+    });
 });
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -33,10 +37,11 @@ builder.Services.AddDbContext<CloudNextDbContext>(options =>
 
 builder.Services.AddCors(options =>
 {
+    var appBaseUrl = builder.Configuration["AppSettings:AppBaseUrl"];
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
+            policy.WithOrigins(appBaseUrl!)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();
@@ -131,7 +136,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 

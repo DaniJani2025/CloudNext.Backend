@@ -162,8 +162,8 @@ namespace CloudNext.Services
             user.IsVerified = true;
             await _userRepository.UpdateUserAsync(user);
 
-            var ApiBaseUrl = _configuration["AppSettings:AppBaseUrl"];
-            return $"{ApiBaseUrl}/verification-complete";
+            var AppBaseUrl = _configuration["AppSettings:AppBaseUrl"];
+            return $"{AppBaseUrl}/verification-complete";
         }
 
         public async Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken)
