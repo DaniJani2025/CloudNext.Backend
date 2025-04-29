@@ -18,7 +18,7 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(5074);
     options.ListenAnyIP(7245, listenOptions =>
     {
-        listenOptions.UseHttps(new X509Certificate2("Certificates/localhost-cert.pfx", "1234"));
+        listenOptions.UseHttps(new X509Certificate2("D:\\Projects\\CloudNext\\Certificates\\localhost-cert.pfx", "DaniJani2000"));
     });
 });
 
