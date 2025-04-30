@@ -8,5 +8,6 @@ namespace CloudNext.Interfaces
         Task<(byte[] Data, string FileName, string ContentType)> GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId);
         Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid? parentFolderId, Guid userId);
         Task<List<ThumbnailDto>> GetThumbnailsForFolderAsync(Guid? folderId, Guid userId);
+        Task<FileStreamWithMetadataDto> StreamDecryptedVideoAsync(Guid fileId, string userId, string rangeHeader);
     }
 }
