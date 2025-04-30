@@ -19,6 +19,12 @@ namespace CloudNext.Repositories.Users
             await _context.SaveChangesAsync();
         }
 
+        public async Task<UserFile?> GetFileByIdAsync(Guid fileId)
+        {
+            return await _context.UserFiles
+                .FirstOrDefaultAsync(f => f.Id == fileId);
+        }
+
         public async Task<List<UserFile>> GetFilesByIdsAsync(List<Guid> fileIds)
         {
             return await _context.UserFiles

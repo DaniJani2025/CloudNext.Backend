@@ -90,5 +90,20 @@ namespace CloudNext.Controllers
             var thumbnails = await _fileService.GetThumbnailsForFolderAsync(folderId, userId);
             return Ok(thumbnails);
         }
+
+        [HttpGet("stream/{fileId}")]
+        public async Task<IActionResult> StreamVideo(Guid fileId, [FromQuery] string userId)
+        {
+            var rangeHeader = Request.Headers["Range"].ToString();
+
+            var result = await _fileService.StreamDecryptedVideoAsync(fileId, userId, rangeHeader);
+
+            Response.StatusCode = StatusCodes.Status206PartialContent;
+            Response.ContentLength = result.ContentLength;
+            Response.Headers["Content-Range"] = result.ContentRange;
+            Response.Headers["Accept-Ranges"] = "bytes";
+
+            return new FileStreamResult(result.Stream, result.ContentType);
+        }
     }
 }
