@@ -13,12 +13,15 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(options =>
+builder.WebHost.ConfigureKestrel((context, options) =>
 {
-    options.ListenAnyIP(5074);
+    var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
+    var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
+
+    options.ListenAnyIP(5074); // http
     options.ListenAnyIP(7245, listenOptions =>
     {
-        listenOptions.UseHttps(new X509Certificate2("D:\\Projects\\CloudNext\\Certificates\\localhost-cert.pfx", "DaniJani2000"));
+        listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
     });
 });
 
