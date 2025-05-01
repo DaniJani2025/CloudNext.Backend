@@ -5,6 +5,8 @@ namespace CloudNext.Utils
 {
     public static class EncryptionHelper
     {
+        private static readonly int _iterations = 100_000;
+
         public static string EncryptData(string plainText, string key)
         {
             using var aes = Aes.Create();
@@ -36,6 +38,15 @@ namespace CloudNext.Utils
             var decryptedBytes = decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
 
             return Encoding.UTF8.GetString(decryptedBytes);
+        }
+
+        public static string DeriveKeyFromPassword(string password, string saltHex)
+        {
+            int keySize = EncryptionConfig.KeySize;
+
+            byte[] salt = Convert.FromHexString(saltHex);
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, _iterations, HashAlgorithmName.SHA256);
+            return Convert.ToHexString(pbkdf2.GetBytes(keySize));
         }
 
         public static byte[] EncryptFileBytes(byte[] fileBytes, string hexKey)

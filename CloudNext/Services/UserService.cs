@@ -49,7 +49,7 @@ namespace CloudNext.Services
             if (!user.IsVerified)
                 return (null, string.Empty, "User is not verified yet");
 
-            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, user.PasswordSalt!);
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(password, user.PasswordSalt!);
 
             string decryptedUserKey;
             try
@@ -98,7 +98,7 @@ namespace CloudNext.Services
             RandomNumberGenerator.Fill(saltBytes);
             var saltHex = Convert.ToHexString(saltBytes);
 
-            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, saltHex);
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(password, saltHex);
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
