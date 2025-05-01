@@ -5,6 +5,7 @@ using CloudNext.Interfaces;
 using CloudNext.Models;
 using CloudNext.Repositories.Users;
 using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -155,22 +156,41 @@ namespace CloudNext.Services
 
             foreach (var file in files)
             {
-                if (!(file.ContentType.StartsWith("image/") || file.ContentType.StartsWith("video/")))
-                    continue;
+                string? base64Thumbnail = null;
 
-                var thumbPath = Path.Combine(thumbnailFolderPath, $"{file.Id}.png");
-                if (!System.IO.File.Exists(thumbPath))
-                    continue;
-
-                var imageBytes = await System.IO.File.ReadAllBytesAsync(thumbPath);
-                var base64 = Convert.ToBase64String(imageBytes);
-
-                thumbnails.Add(new ThumbnailDto
+                if (Constants.Media.SupportedImageTypes.Contains(file.ContentType) ||
+                    Constants.Media.SupportedVideoTypes.Contains(file.ContentType))
                 {
-                    FileId = file.Id,
-                    OriginalName = file.OriginalName,
-                    Base64Thumbnail = $"data:image/png;base64,{base64}"
-                });
+                    var thumbPath = Path.Combine(thumbnailFolderPath, $"{file.Id}.png");
+                    if (System.IO.File.Exists(thumbPath))
+                    {
+                        var imageBytes = await System.IO.File.ReadAllBytesAsync(thumbPath);
+                        base64Thumbnail = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
+                    }
+                }
+                else
+                {
+                    var ext = Path.GetExtension(file.OriginalName)?.ToLower();
+                    if (ext != null && Constants.Media.CommonFileLogos.TryGetValue(ext, out var logoFile))
+                    {
+                        var logoPath = Path.Combine(AppContext.BaseDirectory, "Documents", "CommonThumbnails", logoFile);
+                        if (System.IO.File.Exists(logoPath))
+                        {
+                            var logoBytes = await System.IO.File.ReadAllBytesAsync(logoPath);
+                            base64Thumbnail = $"data:image/png;base64,{Convert.ToBase64String(logoBytes)}";
+                        }
+                    }
+                }
+
+                if (base64Thumbnail != null)
+                {
+                    thumbnails.Add(new ThumbnailDto
+                    {
+                        FileId = file.Id,
+                        OriginalName = file.OriginalName,
+                        Base64Thumbnail = base64Thumbnail
+                    });
+                }
             }
 
             return thumbnails;
