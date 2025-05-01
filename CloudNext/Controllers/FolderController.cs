@@ -13,10 +13,10 @@ namespace CloudNext.Controllers
     [Authorize]
     public class FolderController : ControllerBase
     {
-        private readonly FolderService _folderService;
+        private readonly IFolderService _folderService;
         private readonly IUserSessionService _userSessionService;
 
-        public FolderController(FolderService folderService, IUserSessionService userSessionService)
+        public FolderController(IFolderService folderService, IUserSessionService userSessionService)
         {
             _folderService = folderService;
             _userSessionService = userSessionService;

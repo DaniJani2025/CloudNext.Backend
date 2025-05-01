@@ -1,14 +1,13 @@
 ﻿using CloudNext.DTOs.UserFolder;
 using CloudNext.Interfaces;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.IO.Compression;
 
 namespace CloudNext.Services
 {
-    public class FolderService
+    public class FolderService : IFolderService
     {
         private readonly IUserFolderRepository _userFolderRepository;
         private readonly IFileRepository _fileRepository;

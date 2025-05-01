@@ -3,7 +3,7 @@ using System.Text;
 using CloudNext.Common;
 using CloudNext.Data;
 using CloudNext.Interfaces;
-using CloudNext.Repositories.Users;
+using CloudNext.Repositories;
 using CloudNext.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -52,13 +52,12 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IFileRepository, FileRepository>();
-builder.Services.AddScoped<FolderService>();
+builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
-
 
 builder.Services.AddScoped<SMTPService>();
 
@@ -92,7 +91,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -121,7 +119,6 @@ builder.Services.AddSwaggerGen(c =>
         { jwtSecurityScheme, Array.Empty<string>() }
     });
 });
-
 
 var app = builder.Build();
 

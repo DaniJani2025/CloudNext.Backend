@@ -3,7 +3,7 @@ using CloudNext.Interfaces;
 using CloudNext.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CloudNext.Repositories.Users
+namespace CloudNext.Repositories
 {
     public class UserFolderRepository : IUserFolderRepository
     {

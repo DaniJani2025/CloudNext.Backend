@@ -6,6 +6,7 @@ using CloudNext.Services;
 using CloudNext.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CloudNext.Interfaces;
 
 namespace CloudNext.Controllers
 {
@@ -13,9 +14,9 @@ namespace CloudNext.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly UserService _userService;
+        private readonly IUserService _userService;
 
-        public UsersController(UserService userService)
+        public UsersController(IUserService userService)
         {
             _userService = userService;
         }

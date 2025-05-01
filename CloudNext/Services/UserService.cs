@@ -1,6 +1,5 @@
 ﻿using CloudNext.DTOs.Users;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
 using CloudNext.Utils;
 using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +12,7 @@ using System.Text;
 
 namespace CloudNext.Services
 {
-    public class UserService
+    public class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
         private readonly IUserFolderRepository _userFolderRepository;
