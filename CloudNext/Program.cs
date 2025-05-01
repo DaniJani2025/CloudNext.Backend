@@ -54,16 +54,15 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
-builder.Services.AddScoped<UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IFileRepository, FileRepository>();
 builder.Services.AddScoped<FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
 
 
-builder.Services.AddHttpContextAccessor();
-
 builder.Services.AddScoped<SMTPService>();
+
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers();
 
