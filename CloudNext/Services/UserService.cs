@@ -19,8 +19,8 @@ namespace CloudNext.Services
         private readonly IUserFolderRepository _userFolderRepository;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUserSessionService _userSessionService;
         private readonly SMTPService _smtpService;
-        private readonly UserSessionService _userSessionService;
 
         public UserService
         (
@@ -28,8 +28,8 @@ namespace CloudNext.Services
             IUserFolderRepository userFolderRepository,
             IConfiguration configuration,
             IHttpContextAccessor httpContextAccessor,
-            SMTPService smtpService,
-            UserSessionService userSessionService
+            IUserSessionService userSessionService,
+            SMTPService smtpService
         )
         {
             _userRepository = userRepository;
