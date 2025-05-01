@@ -2,6 +2,7 @@
 using CloudNext.Models;
 using CloudNext.Repositories.Users;
 using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -66,7 +67,7 @@ namespace CloudNext.Services
             var refreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays);
             await _userRepository.UpdateUserAsync(user);
 
             var httpContext = _httpContextAccessor.HttpContext;
@@ -75,7 +76,7 @@ namespace CloudNext.Services
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays)
             });
 
             return (user, token, "Login successful");
@@ -185,7 +186,7 @@ namespace CloudNext.Services
             var newRefreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
 
             user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays);
             await _userRepository.UpdateUserAsync(user);
 
             var httpContext = _httpContextAccessor.HttpContext;
@@ -194,7 +195,7 @@ namespace CloudNext.Services
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays)
             });
 
             return (newAccessToken, true, "Tokens refreshed successfully");

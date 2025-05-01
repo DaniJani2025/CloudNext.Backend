@@ -2,6 +2,12 @@
 {
     public class Constants
     {
+        public static class Token
+        {
+            public const int TokenExpirationHours = 24;
+            public const int RefreshExpirationDays = 7;
+        }
+
         public static class Media
         {
             public static readonly HashSet<string> SupportedImageTypes = new()

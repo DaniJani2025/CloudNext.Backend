@@ -3,6 +3,7 @@ using CloudNext.DTOs;
 using CloudNext.DTOs.Users;
 using CloudNext.Models;
 using CloudNext.Services;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,7 +31,7 @@ namespace CloudNext.Controllers
             var response = new LoginResponseDto
             {
                 Token = token,
-                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                ExpiresAt = DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours),
                 UserId = user.Id,
                 Email = user.Email
             };
@@ -98,7 +99,7 @@ namespace CloudNext.Controllers
             var response = new TokenRefreshResponseDto
             {
                 Token = newAccessToken,
-                ExpiresAt = DateTime.UtcNow.AddHours(24)
+                ExpiresAt = DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours)
             };
 
             return Ok(ApiResponse<TokenRefreshResponseDto>.SuccessResponse(response));
