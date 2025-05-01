@@ -18,7 +18,7 @@ builder.WebHost.ConfigureKestrel((context, options) =>
     var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
     var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
 
-    options.ListenAnyIP(5074); // http
+    options.ListenAnyIP(5074);
     options.ListenAnyIP(7245, listenOptions =>
     {
         listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
@@ -95,7 +95,6 @@ builder.Services.AddAuthentication(options =>
 
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "CloudNext API", Version = "v1" });
