@@ -72,6 +72,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Ignore EF Core migration files
+[Mm]igrations/
+
 # Tye
 .tye/
 
