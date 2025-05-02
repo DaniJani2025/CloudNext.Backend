@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CloudNext.Repositories
 {
-    public class FileRepository : IFileRepository
+    public class UserFileRepository : IUserFileRepository
     {
         private readonly CloudNextDbContext _context;
 
-        public FileRepository(CloudNextDbContext context)
+        public UserFileRepository(CloudNextDbContext context)
         {
             _context = context;
         }

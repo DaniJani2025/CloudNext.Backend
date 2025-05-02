@@ -55,7 +55,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
-builder.Services.AddScoped<IFileRepository, FileRepository>();
+builder.Services.AddScoped<IUserFileRepository, UserFileRepository>();
 builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
 

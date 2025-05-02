@@ -10,10 +10,10 @@ namespace CloudNext.Services
     public class FolderService : IFolderService
     {
         private readonly IUserFolderRepository _userFolderRepository;
-        private readonly IFileRepository _fileRepository;
+        private readonly IUserFileRepository _fileRepository;
         private readonly IFileService _fileService;
 
-        public FolderService(IUserFolderRepository userFolderRepository, IFileService fileService, IFileRepository fileRepository)
+        public FolderService(IUserFolderRepository userFolderRepository, IFileService fileService, IUserFileRepository fileRepository)
         {
             _userFolderRepository = userFolderRepository;
             _fileService = fileService;

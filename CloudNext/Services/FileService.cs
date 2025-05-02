@@ -3,6 +3,7 @@ using CloudNext.Data;
 using CloudNext.DTOs.UserFiles;
 using CloudNext.Interfaces;
 using CloudNext.Models;
+using CloudNext.Repositories;
 using CloudNext.Utils;
 using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
@@ -13,10 +14,10 @@ namespace CloudNext.Services
     public class FileService : IFileService
     {
         private readonly IUserSessionService _userSessionService;
-        private readonly IFileRepository _fileRepository;
+        private readonly IUserFileRepository _fileRepository;
         private readonly IUserFolderRepository _userFolderRepository;
 
-        public FileService(IUserSessionService userSessionService, IFileRepository fileRepository, IUserFolderRepository userFolderRepository)
+        public FileService(IUserSessionService userSessionService, IUserFileRepository fileRepository, IUserFolderRepository userFolderRepository)
         {
             _userSessionService = userSessionService;
             _fileRepository = fileRepository;

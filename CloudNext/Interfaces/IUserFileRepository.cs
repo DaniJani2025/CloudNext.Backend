@@ -3,7 +3,7 @@ using CloudNext.Models;
 
 namespace CloudNext.Interfaces
 {
-    public interface IFileRepository
+    public interface IUserFileRepository
     {
         Task AddFileAsync(UserFile file);
         Task<UserFile?> GetFileByIdAsync(Guid fileId);
