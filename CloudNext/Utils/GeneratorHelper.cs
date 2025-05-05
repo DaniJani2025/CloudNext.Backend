@@ -66,6 +66,9 @@ namespace CloudNext.Utils
             }
             else if (contentType.StartsWith("video/"))
             {
+                if (!Constants.Media.SupportedVideoTypes.Contains(contentType.ToLower()))
+                    return;
+
                 var tempVideoPath = Path.GetTempFileName();
                 File.WriteAllBytes(tempVideoPath, fileBytes);
 
@@ -83,7 +86,7 @@ namespace CloudNext.Utils
                 };
 
                 using var process = Process.Start(startInfo);
-                process.WaitForExit();
+                process!.WaitForExit();
 
                 File.Delete(tempVideoPath);
             }

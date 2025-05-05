@@ -17,7 +17,7 @@
 
             public static readonly HashSet<string> SupportedVideoTypes = new()
             {
-                "video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"
+                "video/mp4", "video/quicktime", "video/x-matroska"
             };
 
             public static readonly Dictionary<string, string> CommonFileLogos = new()
@@ -28,6 +28,8 @@
                 { ".ico", "image.png" },
                 { ".jfif", "image.png" },
                 { ".svg", "image.png" },
+
+                { ".avi", "video.png" },
 
                 { ".pdf", "pdf.png" },
                 { ".docx", "word.png" },
