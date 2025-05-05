@@ -149,9 +149,6 @@ namespace CloudNext.Services
             var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
             var thumbnailFolderPath = Path.Combine(folderPath, ".thumbnails");
 
-            if (!Directory.Exists(thumbnailFolderPath))
-                return new List<ThumbnailDto>();
-
             var thumbnails = new List<ThumbnailDto>();
 
             foreach (var file in files)
