@@ -51,8 +51,8 @@ builder.Services.AddCors(options =>
         });
 });
 
-builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IUserFileRepository, UserFileRepository>();
