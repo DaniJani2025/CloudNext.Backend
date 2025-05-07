@@ -78,7 +78,7 @@ namespace CloudNext.Services
             if (rootFolder == null || rootFolder.UserId != userId)
                 throw new InvalidOperationException("Folder not found or access denied.");
 
-            var userKey = _userSessionService.GetEncryptionKey(userId);
+            var userKey = await _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
                 throw new InvalidOperationException("Encryption key not found for the user.");
 

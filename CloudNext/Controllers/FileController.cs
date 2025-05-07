@@ -27,7 +27,7 @@ namespace CloudNext.Controllers
             [FromQuery] Guid userId,
             [FromForm] List<IFormFile> files)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(userId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -83,7 +83,7 @@ namespace CloudNext.Controllers
         [HttpPost("download")]
         public async Task<IActionResult> DownloadFiles([FromBody] FileDownloadRequestDto request)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(request.UserId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(request.UserId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -97,7 +97,7 @@ namespace CloudNext.Controllers
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetFolderThumbnails([FromQuery] Guid userId, [FromQuery] Guid? folderId)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(userId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 

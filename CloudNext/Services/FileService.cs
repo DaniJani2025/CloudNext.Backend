@@ -42,7 +42,7 @@ namespace CloudNext.Services
                 folderVirtualPath = "";
             }
 
-            var userKey = _userSessionService.GetEncryptionKey(userId);
+            var userKey = await _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
                 throw new InvalidOperationException("Encryption key not found for the user.");
 
@@ -91,7 +91,7 @@ namespace CloudNext.Services
         public async Task<(byte[] Data, string FileName, string ContentType)> GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId)
         {
             var files = await _fileRepository.GetFilesByIdsAsync(fileIds);
-            var userKey = _userSessionService.GetEncryptionKey(userId);
+            var userKey = await _userSessionService.GetEncryptionKey(userId);
 
             if (string.IsNullOrEmpty(userKey))
                 throw new InvalidOperationException("Encryption key not found for the user.");
@@ -199,7 +199,7 @@ namespace CloudNext.Services
             if (file == null || file.UserId.ToString() != userId)
                 throw new FileNotFoundException("File not found or access denied.");
 
-            var userKey = _userSessionService.GetEncryptionKey(Guid.Parse(userId));
+            var userKey = await _userSessionService.GetEncryptionKey(Guid.Parse(userId));
             if (string.IsNullOrEmpty(userKey))
                 throw new UnauthorizedAccessException("Encryption key not found.");
 

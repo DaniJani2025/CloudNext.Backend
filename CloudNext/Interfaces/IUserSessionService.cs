@@ -2,8 +2,8 @@
 {
     public interface IUserSessionService
     {
-        void SetSession(Guid userId, string key);
-        string? GetEncryptionKey(Guid userId);
-        void RemoveSession(Guid userId);
+        Task SetSession(Guid userId, string key);
+        Task<string?> GetEncryptionKey(Guid userId);
+        Task RemoveSession(Guid userId);
     }
 }
