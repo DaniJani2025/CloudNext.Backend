@@ -2,9 +2,11 @@
 using CloudNext.Interfaces;
 using CloudNext.Models;
 using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.IO.Compression;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CloudNext.Services
 {
@@ -103,8 +105,11 @@ namespace CloudNext.Services
             return zipMemoryStream.ToArray();
         }
 
-        public async Task UploadFolderAsync(Guid userId, FolderUploadDto dto)
+        public async Task<UploadResultDto> UploadFolderAsync(Guid userId, FolderUploadDto dto)
         {
+            var uploaded = 0;
+            var skipped = 0;
+
             var parentFolder = await _userFolderRepository.GetFolderByIdAsync(Guid.Parse(dto.ParentFolderId));
             if (parentFolder == null || parentFolder.UserId != userId)
                 throw new InvalidOperationException("Parent folder not found or access denied.");
@@ -152,6 +157,15 @@ namespace CloudNext.Services
                 ms.Position = 0;
 
                 string detectedContentType = MimeHelper.GetMimeType(entry.Name, ms.ToArray());
+                var ext = Path.GetExtension(entry.Name)?.ToLowerInvariant();
+
+                if (!Constants.Media.SupportedImageTypes.Contains(detectedContentType)
+                    && !Constants.Media.SupportedVideoTypes.Contains(detectedContentType)
+                    && !Constants.Media.CommonFileLogos.ContainsKey(ext!))
+                    {
+                        skipped++;
+                        continue;
+                    }
 
                 ms.Position = 0;
 
@@ -162,7 +176,10 @@ namespace CloudNext.Services
                 };
 
                 await _fileService.SaveEncryptedFileAsync(formFile, currentParentId, userId);
+                uploaded++;
             }
+
+            return new UploadResultDto { UploadedCount = uploaded, SkippedCount = skipped };
         }
 
         public async Task<List<FolderResponseDto>> GetFoldersInCurrentDirectoryAsync(Guid userId, Guid? folderId)

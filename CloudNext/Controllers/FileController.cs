@@ -1,6 +1,6 @@
 ﻿using CloudNext.DTOs.UserFiles;
 using CloudNext.Interfaces;
-using CloudNext.Models;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -39,9 +39,19 @@ namespace CloudNext.Controllers
                 folderId = parsedId;
 
             var results = new List<FileUploadResultDto>();
+            var skippedCount = 0;
 
             foreach (var file in files)
             {
+                var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
+                if (!Constants.Media.SupportedImageTypes.Contains(file.ContentType)
+                && !Constants.Media.SupportedVideoTypes.Contains(file.ContentType)
+                && !Constants.Media.CommonFileLogos.ContainsKey(ext))
+                {
+                    skippedCount++;
+                    continue;
+                }
+
                 try
                 {
                     var savedFile = await _fileService.SaveEncryptedFileAsync(file, folderId, userId);
@@ -55,13 +65,17 @@ namespace CloudNext.Controllers
                 }
                 catch (InvalidOperationException ex)
                 {
+                    skippedCount++;
                     return BadRequest(new { Error = ex.Message, FileName = file.FileName });
                 }
             }
-
+            var message = skippedCount > 0
+                    ? "Some files were not uploaded."
+                    : "File upload process completed.";
+            
             return Ok(new
             {
-                Message = "File upload process completed.",
+                Message = message,
                 Results = results
             });
         }
