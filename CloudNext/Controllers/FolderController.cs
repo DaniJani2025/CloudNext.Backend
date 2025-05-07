@@ -4,6 +4,7 @@ using CloudNext.Models;
 using CloudNext.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CloudNext.Controllers
@@ -72,8 +73,16 @@ namespace CloudNext.Controllers
 
             try
             {
-                await _folderService.UploadFolderAsync(dto.UserId, dto);
-                return Ok("Folder uploaded successfully.");
+                var result = await _folderService.UploadFolderAsync(dto.UserId, dto);
+                var msg = result.SkippedCount > 0
+                            ? "Folder uploaded—with some files skipped."
+                            : "Folder uploaded successfully.";
+                return Ok(new
+                {
+                    Message = msg,
+                    UploadedCount = result.UploadedCount,
+                    SkippedCount = result.SkippedCount
+                });
             }
             catch (Exception ex)
             {
