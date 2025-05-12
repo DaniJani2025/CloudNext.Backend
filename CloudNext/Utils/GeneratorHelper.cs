@@ -49,7 +49,7 @@ namespace CloudNext.Utils
             return new string(keyChars);
         }
 
-        public static void GenerateThumbnail(byte[] fileBytes, string contentType, string thumbnailPath)
+        public async static Task GenerateThumbnail(byte[] fileBytes, string contentType, string thumbnailPath)
         {
             if (contentType.StartsWith("image/"))
             {
@@ -66,29 +66,44 @@ namespace CloudNext.Utils
             }
             else if (contentType.StartsWith("video/"))
             {
-                if (!Constants.Media.SupportedVideoTypes.Contains(contentType.ToLower()))
+                // strip any “; codecs=” suffix
+                var mediaType = contentType.Split(';')[0].Trim().ToLowerInvariant();
+                if (!Constants.Media.SupportedVideoTypes.Contains(mediaType))
                     return;
 
-                var tempVideoPath = Path.GetTempFileName();
+                // write to temp file with correct extension
+                var ext = mediaType switch
+                {
+                    "video/mp4" => ".mp4",
+                    "video/avi" => ".avi",
+                    _ => Path.GetExtension(thumbnailPath)
+                };
+                var tempVideoPath = Path.ChangeExtension(Path.GetTempFileName(), ext);
                 File.WriteAllBytes(tempVideoPath, fileBytes);
 
-                var outputThumbnailPath = thumbnailPath;
-                var ffmpegPath = "ffmpeg";
-
-                var startInfo = new ProcessStartInfo
+                try
                 {
-                    FileName = ffmpegPath,
-                    Arguments = $"-i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{outputThumbnailPath}\" -y",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffmpeg",   // or full path
+                        Arguments = $"-hide_banner -loglevel error -i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{thumbnailPath}\" -y",
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
 
-                using var process = Process.Start(startInfo);
-                process!.WaitForExit();
+                    using var process = Process.Start(startInfo)!;
+                    // read the single stderr stream so we don’t deadlock
+                    var error = await process.StandardError.ReadToEndAsync();
+                    process.WaitForExit();
 
-                File.Delete(tempVideoPath);
+                    if (process.ExitCode != 0)
+                        throw new InvalidOperationException($"FFmpeg error (code {process.ExitCode}): {error}");
+                }
+                finally
+                {
+                    File.Delete(tempVideoPath);
+                }
             }
         }
     }

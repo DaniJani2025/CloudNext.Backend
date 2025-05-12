@@ -65,7 +65,7 @@ namespace CloudNext.Services
                 Directory.CreateDirectory(thumbnailFolderPath);
                 var thumbnailPath = Path.Combine(thumbnailFolderPath, $"{fileId}.png");
 
-                GeneratorHelper.GenerateThumbnail(fileBytes, contentType, thumbnailPath);
+                await GeneratorHelper.GenerateThumbnail(fileBytes, contentType, thumbnailPath);
             }
 
             byte[] encryptedData = EncryptionHelper.EncryptFileBytes(fileBytes, userKey);
