@@ -117,7 +117,7 @@ namespace CloudNext.Controllers
             return Ok(ApiResponse<string>.SuccessResponse(result));
         }
 
-        [HttpPost("reset-password")]
+        [HttpPatch("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
         {
             var result = await _userService.ResetPasswordAsync(request.Token, request.NewPassword, request.RecoveryKey);
