@@ -1,8 +1,9 @@
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using CloudNext.Common;
 using CloudNext.Data;
 using CloudNext.Interfaces;
-using CloudNext.Repositories.Users;
+using CloudNext.Repositories;
 using CloudNext.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -12,10 +13,16 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(options =>
+builder.WebHost.ConfigureKestrel((context, options) =>
 {
+    var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
+    var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
+
     options.ListenAnyIP(5074);
-    //options.ListenAnyIP(7245, listenOptions => listenOptions.UseHttps());
+    options.ListenAnyIP(7245, listenOptions =>
+    {
+        listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
+    });
 });
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -33,29 +40,28 @@ builder.Services.AddDbContext<CloudNextDbContext>(options =>
 
 builder.Services.AddCors(options =>
 {
+    var appBaseUrl = builder.Configuration["AppSettings:AppBaseUrl"];
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
+            policy.WithOrigins(appBaseUrl!)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();
         });
 });
 
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
-builder.Services.AddScoped<UserSessionService>();
 builder.Services.AddScoped<IFileService, FileService>();
-builder.Services.AddScoped<IFileRepository, FileRepository>();
-builder.Services.AddScoped<FolderService>();
+builder.Services.AddScoped<IUserFileRepository, UserFileRepository>();
+builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
 
+builder.Services.AddScoped<SMTPService>();
 
 builder.Services.AddHttpContextAccessor();
-
-builder.Services.AddScoped<SMTPService>();
 
 builder.Services.AddControllers();
 
@@ -85,9 +91,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "CloudNext API", Version = "v1" });
@@ -116,7 +120,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -131,7 +134,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 

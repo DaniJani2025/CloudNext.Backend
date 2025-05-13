@@ -1,24 +1,33 @@
 ﻿using CloudNext.DTOs.UserFolder;
 using CloudNext.Interfaces;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
+using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.IO.Compression;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CloudNext.Services
 {
-    public class FolderService
+    public class FolderService : IFolderService
     {
         private readonly IUserFolderRepository _userFolderRepository;
-        private readonly IFileRepository _fileRepository;
+        private readonly IUserFileRepository _fileRepository;
         private readonly IFileService _fileService;
+        private readonly IUserSessionService _userSessionService;
 
-        public FolderService(IUserFolderRepository userFolderRepository, IFileService fileService, IFileRepository fileRepository)
+        public FolderService(
+            IUserFolderRepository userFolderRepository, 
+            IFileService fileService, 
+            IUserFileRepository fileRepository,
+            IUserSessionService userSessionService
+            )
         {
             _userFolderRepository = userFolderRepository;
             _fileService = fileService;
             _fileRepository = fileRepository;
+            _userSessionService = userSessionService;
         }
 
         public async Task<FolderResponseDto> CreateFolderAsync(CreateFolderDto dto)
@@ -65,21 +74,28 @@ namespace CloudNext.Services
 
         public async Task<byte[]> DownloadFolderAsync(Guid userId, Guid folderId)
         {
-            var folder = await _userFolderRepository.GetFolderByIdAsync(folderId);
-            if (folder == null || folder.UserId != userId)
+            var rootFolder = await _userFolderRepository.GetFolderByIdAsync(folderId);
+            if (rootFolder == null || rootFolder.UserId != userId)
                 throw new InvalidOperationException("Folder not found or access denied.");
 
-            var filesInFolder = await _fileRepository.GetFilesByFolderIdAsync(folderId);
+            var userKey = _userSessionService.GetEncryptionKey(userId);
+            if (string.IsNullOrEmpty(userKey))
+                throw new InvalidOperationException("Encryption key not found for the user.");
+
+            var allFilesWithPaths = await CollectFilesRecursively(userId, rootFolder);
 
             using var zipMemoryStream = new MemoryStream();
             using (var archive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
             {
-                foreach (var file in filesInFolder)
+                foreach (var (file, relativePath) in allFilesWithPaths)
                 {
-                    var (decryptedBytes, originalName, _) = await _fileService.GetDecryptedFilesAsync(new List<Guid> { file.Id }, userId);
+                    var fileSystemPath = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
+                    if (!File.Exists(fileSystemPath)) continue;
 
-                    var entryPath = Path.Combine(folder.Name, originalName).Replace("\\", "/");
-                    var zipEntry = archive.CreateEntry(entryPath, CompressionLevel.Fastest);
+                    var encryptedBytes = await File.ReadAllBytesAsync(fileSystemPath);
+                    var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
+
+                    var zipEntry = archive.CreateEntry(relativePath, CompressionLevel.Fastest);
                     using var entryStream = zipEntry.Open();
                     await entryStream.WriteAsync(decryptedBytes, 0, decryptedBytes.Length);
                 }
@@ -89,8 +105,11 @@ namespace CloudNext.Services
             return zipMemoryStream.ToArray();
         }
 
-        public async Task UploadFolderAsync(Guid userId, FolderUploadDto dto)
+        public async Task<UploadResultDto> UploadFolderAsync(Guid userId, FolderUploadDto dto)
         {
+            var uploaded = 0;
+            var skipped = 0;
+
             var parentFolder = await _userFolderRepository.GetFolderByIdAsync(Guid.Parse(dto.ParentFolderId));
             if (parentFolder == null || parentFolder.UserId != userId)
                 throw new InvalidOperationException("Parent folder not found or access denied.");
@@ -138,6 +157,15 @@ namespace CloudNext.Services
                 ms.Position = 0;
 
                 string detectedContentType = MimeHelper.GetMimeType(entry.Name, ms.ToArray());
+                var ext = Path.GetExtension(entry.Name)?.ToLowerInvariant();
+
+                if (!Constants.Media.SupportedImageTypes.Contains(detectedContentType)
+                    && !Constants.Media.SupportedVideoTypes.Contains(detectedContentType)
+                    && !Constants.Media.CommonFileLogos.ContainsKey(ext!))
+                    {
+                        skipped++;
+                        continue;
+                    }
 
                 ms.Position = 0;
 
@@ -148,7 +176,10 @@ namespace CloudNext.Services
                 };
 
                 await _fileService.SaveEncryptedFileAsync(formFile, currentParentId, userId);
+                uploaded++;
             }
+
+            return new UploadResultDto { UploadedCount = uploaded, SkippedCount = skipped };
         }
 
         public async Task<List<FolderResponseDto>> GetFoldersInCurrentDirectoryAsync(Guid userId, Guid? folderId)
@@ -204,6 +235,26 @@ namespace CloudNext.Services
                 VirtualPath = folder.VirtualPath,
                 SubFolders = subFolderTrees
             };
+        }
+
+        private async Task<List<(UserFile file, string relativePath)>> CollectFilesRecursively(Guid userId, UserFolder folder)
+        {
+            var result = new List<(UserFile, string)>();
+
+            var files = await _fileRepository.GetFilesByFolderIdAsync(folder.Id);
+            foreach (var file in files)
+            {
+                var relativePath = Path.Combine(folder.VirtualPath.TrimStart('/'), file.OriginalName).Replace("\\", "/");
+                result.Add((file, relativePath));
+            }
+
+            var subfolders = await _userFolderRepository.GetFoldersByParentIdAsync(userId, folder.Id);
+            foreach (var subfolder in subfolders)
+            {
+                result.AddRange(await CollectFilesRecursively(userId, subfolder));
+            }
+
+            return result;
         }
 
         public static class MimeHelper

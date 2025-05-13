@@ -1,9 +1,9 @@
 ﻿using CloudNext.Data;
+using CloudNext.Interfaces;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
 using Microsoft.EntityFrameworkCore;
 
-namespace CloudNext.Repositories.Users
+namespace CloudNext.Repositories
 {
     public class UserRepository : IUserRepository
     {

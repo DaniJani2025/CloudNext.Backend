@@ -1,14 +1,15 @@
 ﻿using CloudNext.Data;
+using CloudNext.Interfaces;
 using CloudNext.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CloudNext.Repositories.Users
+namespace CloudNext.Repositories
 {
-    public class FileRepository : IFileRepository
+    public class UserFileRepository : IUserFileRepository
     {
         private readonly CloudNextDbContext _context;
 
-        public FileRepository(CloudNextDbContext context)
+        public UserFileRepository(CloudNextDbContext context)
         {
             _context = context;
         }
@@ -17,6 +18,12 @@ namespace CloudNext.Repositories.Users
         {
             _context.UserFiles.Add(file);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<UserFile?> GetFileByIdAsync(Guid fileId)
+        {
+            return await _context.UserFiles
+                .FirstOrDefaultAsync(f => f.Id == fileId);
         }
 
         public async Task<List<UserFile>> GetFilesByIdsAsync(List<Guid> fileIds)

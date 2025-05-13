@@ -2,25 +2,25 @@
   "profiles": {
     "http": {
       "commandName": "Project",
-      "commandLineArgs": "http://localhost:5074/swagger/index.html",
+      "commandLineArgs": "http://$(CLOUDNEXT_HOST):5074/swagger/index.html",
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5074"
+      "applicationUrl": "http://$(CLOUDNEXT_HOST):5074"
     },
     "https": {
       "commandName": "Project",
-      "commandLineArgs": "https://localhost:7245/swagger/index.html",
+      "commandLineArgs": "https://$(CLOUDNEXT_HOST):7245/swagger/index.html",
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:7245;http://localhost:5074"
+      "applicationUrl": "https://$(CLOUDNEXT_HOST):7245;http://$(CLOUDNEXT_HOST):5074"
     },
     "IIS Express": {
       "commandName": "IISExpress",
@@ -36,7 +36,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:48008",
+      "applicationUrl": "http://$(CLOUDNEXT_HOST):48008",
       "sslPort": 44359
     }
   }

@@ -1,7 +1,7 @@
 ﻿using CloudNext.DTOs.Users;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
 using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -12,14 +12,14 @@ using System.Text;
 
 namespace CloudNext.Services
 {
-    public class UserService
+    public class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
         private readonly IUserFolderRepository _userFolderRepository;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUserSessionService _userSessionService;
         private readonly SMTPService _smtpService;
-        private readonly UserSessionService _userSessionService;
 
         public UserService
         (
@@ -27,8 +27,8 @@ namespace CloudNext.Services
             IUserFolderRepository userFolderRepository,
             IConfiguration configuration,
             IHttpContextAccessor httpContextAccessor,
-            SMTPService smtpService,
-            UserSessionService userSessionService
+            IUserSessionService userSessionService,
+            SMTPService smtpService
         )
         {
             _userRepository = userRepository;
@@ -48,7 +48,7 @@ namespace CloudNext.Services
             if (!user.IsVerified)
                 return (null, string.Empty, "User is not verified yet");
 
-            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, user.PasswordSalt!);
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(password, user.PasswordSalt!);
 
             string decryptedUserKey;
             try
@@ -66,7 +66,7 @@ namespace CloudNext.Services
             var refreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays);
             await _userRepository.UpdateUserAsync(user);
 
             var httpContext = _httpContextAccessor.HttpContext;
@@ -75,7 +75,7 @@ namespace CloudNext.Services
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays)
             });
 
             return (user, token, "Login successful");
@@ -97,7 +97,7 @@ namespace CloudNext.Services
             RandomNumberGenerator.Fill(saltBytes);
             var saltHex = Convert.ToHexString(saltBytes);
 
-            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(password, saltHex);
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(password, saltHex);
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             // Generate recovery key without hex encoding
@@ -128,6 +128,8 @@ namespace CloudNext.Services
             await _userRepository.AddUserAsync(newUser);
             await _smtpService.SendRegistrationMailAsync(email, verificationURL);
 
+            Console.WriteLine($"Verification Url: {verificationURL}");
+
             var rootFolder = await _userFolderRepository.GetFolderAsync(userId, null, "root");
 
             if (rootFolder != null)
@@ -149,21 +151,22 @@ namespace CloudNext.Services
             return newUser;
         }
 
-        public async Task<bool> VerifyEmailAsync(string token)
+        public async Task<string?> VerifyEmailAsync(string token)
         {
             var email = JwtTokenHelper.ValidateRegistrationToken(token, _configuration);
             if (string.IsNullOrEmpty(email))
-                return false;
+                return null;
 
             var user = await _userRepository.GetUserByEmailAsync(email);
 
             if (user == null || user.IsVerified)
-                return false;
+                return null;
 
             user.IsVerified = true;
             await _userRepository.UpdateUserAsync(user);
 
-            return true;
+            var AppBaseUrl = _configuration["AppSettings:AppBaseUrl"];
+            return $"{AppBaseUrl}/verification-complete";
         }
 
         public async Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken)
@@ -185,7 +188,7 @@ namespace CloudNext.Services
             var newRefreshToken = JwtTokenHelper.GenerateRefreshToken(user, _configuration);
 
             user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays);
             await _userRepository.UpdateUserAsync(user);
 
             var httpContext = _httpContextAccessor.HttpContext;
@@ -194,7 +197,7 @@ namespace CloudNext.Services
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays)
             });
 
             return (newAccessToken, true, "Tokens refreshed successfully");

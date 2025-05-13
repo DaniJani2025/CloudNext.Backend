@@ -1,6 +1,6 @@
 ﻿using CloudNext.Models;
 
-namespace CloudNext.Repositories.Users
+namespace CloudNext.Interfaces
 {
     public interface IUserFolderRepository
     {

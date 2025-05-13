@@ -3,8 +3,9 @@ using CloudNext.Data;
 using CloudNext.DTOs.UserFiles;
 using CloudNext.Interfaces;
 using CloudNext.Models;
-using CloudNext.Repositories.Users;
+using CloudNext.Repositories;
 using CloudNext.Utils;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,10 +14,10 @@ namespace CloudNext.Services
     public class FileService : IFileService
     {
         private readonly IUserSessionService _userSessionService;
-        private readonly IFileRepository _fileRepository;
+        private readonly IUserFileRepository _fileRepository;
         private readonly IUserFolderRepository _userFolderRepository;
 
-        public FileService(IUserSessionService userSessionService, IFileRepository fileRepository, IUserFolderRepository userFolderRepository)
+        public FileService(IUserSessionService userSessionService, IUserFileRepository fileRepository, IUserFolderRepository userFolderRepository)
         {
             _userSessionService = userSessionService;
             _fileRepository = fileRepository;
@@ -148,32 +149,90 @@ namespace CloudNext.Services
             var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
             var thumbnailFolderPath = Path.Combine(folderPath, ".thumbnails");
 
-            if (!Directory.Exists(thumbnailFolderPath))
-                return new List<ThumbnailDto>();
-
             var thumbnails = new List<ThumbnailDto>();
 
             foreach (var file in files)
             {
-                if (!(file.ContentType.StartsWith("image/") || file.ContentType.StartsWith("video/")))
-                    continue;
+                string? base64Thumbnail = null;
 
-                var thumbPath = Path.Combine(thumbnailFolderPath, $"{file.Id}.png");
-                if (!System.IO.File.Exists(thumbPath))
-                    continue;
-
-                var imageBytes = await System.IO.File.ReadAllBytesAsync(thumbPath);
-                var base64 = Convert.ToBase64String(imageBytes);
-
-                thumbnails.Add(new ThumbnailDto
+                if (Constants.Media.SupportedImageTypes.Contains(file.ContentType) ||
+                    Constants.Media.SupportedVideoTypes.Contains(file.ContentType))
                 {
-                    FileId = file.Id,
-                    OriginalName = file.OriginalName,
-                    Base64Thumbnail = $"data:image/png;base64,{base64}"
-                });
+                    var thumbPath = Path.Combine(thumbnailFolderPath, $"{file.Id}.png");
+                    if (System.IO.File.Exists(thumbPath))
+                    {
+                        var imageBytes = await System.IO.File.ReadAllBytesAsync(thumbPath);
+                        base64Thumbnail = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
+                    }
+                }
+                else
+                {
+                    var ext = Path.GetExtension(file.OriginalName)?.ToLower();
+                    if (ext != null && Constants.Media.CommonFileLogos.TryGetValue(ext, out var logoFile))
+                    {
+                        var logoPath = Path.Combine(AppContext.BaseDirectory, "Documents", "CommonThumbnails", logoFile);
+                        if (System.IO.File.Exists(logoPath))
+                        {
+                            var logoBytes = await System.IO.File.ReadAllBytesAsync(logoPath);
+                            base64Thumbnail = $"data:image/png;base64,{Convert.ToBase64String(logoBytes)}";
+                        }
+                    }
+                }
+
+                if (base64Thumbnail != null)
+                {
+                    thumbnails.Add(new ThumbnailDto
+                    {
+                        FileId = file.Id,
+                        OriginalName = file.OriginalName,
+                        Base64Thumbnail = base64Thumbnail
+                    });
+                }
             }
 
             return thumbnails;
+        }
+
+        public async Task<FileStreamWithMetadataDto> StreamDecryptedVideoAsync(Guid fileId, string userId, string rangeHeader)
+        {
+            var file = await _fileRepository.GetFileByIdAsync(fileId);
+            if (file == null || file.UserId.ToString() != userId)
+                throw new FileNotFoundException("File not found or access denied.");
+
+            var userKey = _userSessionService.GetEncryptionKey(Guid.Parse(userId));
+            if (string.IsNullOrEmpty(userKey))
+                throw new UnauthorizedAccessException("Encryption key not found.");
+
+            var path = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
+            if (!System.IO.File.Exists(path))
+                throw new FileNotFoundException("Encrypted file not found on disk.");
+
+            var encryptedBytes = await System.IO.File.ReadAllBytesAsync(path);
+            var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
+
+            long totalLength = decryptedBytes.Length;
+            long start = 0;
+            long end = totalLength - 1;
+
+            if (!string.IsNullOrEmpty(rangeHeader) && rangeHeader.StartsWith("bytes="))
+            {
+                var range = rangeHeader.Substring("bytes=".Length).Split('-');
+                if (long.TryParse(range[0], out long parsedStart)) start = parsedStart;
+                if (range.Length > 1 && long.TryParse(range[1], out long parsedEnd)) end = parsedEnd;
+            }
+
+            end = Math.Min(end, totalLength - 1);
+            long contentLength = end - start + 1;
+
+            var stream = new MemoryStream(decryptedBytes, (int)start, (int)contentLength);
+
+            return new FileStreamWithMetadataDto
+            {
+                Stream = stream,
+                ContentType = file.ContentType,
+                ContentLength = contentLength,
+                ContentRange = $"bytes {start}-{end}/{totalLength}"
+            };
         }
     }
 }

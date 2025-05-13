@@ -3,8 +3,10 @@ using CloudNext.DTOs;
 using CloudNext.DTOs.Users;
 using CloudNext.Models;
 using CloudNext.Services;
+using CloudNext.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CloudNext.Interfaces;
 
 namespace CloudNext.Controllers
 {
@@ -12,9 +14,9 @@ namespace CloudNext.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly UserService _userService;
+        private readonly IUserService _userService;
 
-        public UsersController(UserService userService)
+        public UsersController(IUserService userService)
         {
             _userService = userService;
         }
@@ -30,7 +32,7 @@ namespace CloudNext.Controllers
             var response = new LoginResponseDto
             {
                 Token = token,
-                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                ExpiresAt = DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours),
                 UserId = user.Id,
                 Email = user.Email
             };
@@ -76,12 +78,12 @@ namespace CloudNext.Controllers
         [HttpGet("verify")]
         public async Task<IActionResult> VerifyEmail([FromQuery] string token)
         {
-            var result = await _userService.VerifyEmailAsync(token);
+            var redirectUrl = await _userService.VerifyEmailAsync(token);
 
-            if (!result)
+            if (string.IsNullOrEmpty(redirectUrl))
                 return BadRequest(ApiResponse<string>.ErrorResponse("Invalid or expired token"));
 
-            return Ok(ApiResponse<string>.SuccessResponse("Email verified successfully"));
+            return Redirect(redirectUrl);
         }
 
         [HttpPost("refresh-token")]
@@ -98,7 +100,7 @@ namespace CloudNext.Controllers
             var response = new TokenRefreshResponseDto
             {
                 Token = newAccessToken,
-                ExpiresAt = DateTime.UtcNow.AddHours(24)
+                ExpiresAt = DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours)
             };
 
             return Ok(ApiResponse<TokenRefreshResponseDto>.SuccessResponse(response));

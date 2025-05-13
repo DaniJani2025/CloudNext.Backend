@@ -1,4 +1,5 @@
 ﻿using CloudNext.Models;
+using CloudNext.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -9,9 +10,6 @@ namespace CloudNext.Utils
 {
     public static class JwtTokenHelper
     {
-        private const int TOKEN_EXPIRATION_HOURS = 24;
-        private const int REFRESH_TOKEN_EXPIRATION_DAYS = 7;
-
         private static SymmetricSecurityKey GetSecurityKey(IConfiguration configuration)
         {
             var key = configuration["JWT_SECRET_KEY"]
@@ -34,7 +32,7 @@ namespace CloudNext.Utils
                 issuer: configuration["Jwt:Issuer"],
                 audience: configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(TOKEN_EXPIRATION_HOURS),
+                expires: DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours),
                 signingCredentials: credentials
             );
 
@@ -56,7 +54,7 @@ namespace CloudNext.Utils
                 issuer: configuration["Jwt:Issuer"],
                 audience: configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(REFRESH_TOKEN_EXPIRATION_DAYS),
+                expires: DateTime.UtcNow.AddDays(Constants.Token.RefreshExpirationDays),
                 signingCredentials: credentials
             );
 
@@ -78,7 +76,7 @@ namespace CloudNext.Utils
                 issuer: configuration["Jwt:Issuer"],
                 audience: configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(TOKEN_EXPIRATION_HOURS),
+                expires: DateTime.UtcNow.AddHours(Constants.Token.TokenExpirationHours),
                 signingCredentials: credentials
             );
 
