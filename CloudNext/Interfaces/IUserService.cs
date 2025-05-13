@@ -9,6 +9,8 @@ namespace CloudNext.Interfaces
         Task<string?> VerifyEmailAsync(string token);
         Task<(string? AccessToken, bool Success, string Message)> RefreshTokensAsync(string refreshToken);
         void Logout(Guid userId);
+        Task<string> RequestPasswordResetAsync(string email);
+        Task<string> ResetPasswordAsync(string token, string newPassword, string recoveryKey);
         Task<bool> UpdateUserEmailAsync(Guid userId, string newEmail);
         Task<bool> DeleteUserAsync(Guid userId);
     }

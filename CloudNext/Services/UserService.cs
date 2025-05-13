@@ -92,6 +92,7 @@ namespace CloudNext.Services
             var verificationURL = GeneratorHelper.GenerateRegistrationUrl(email, _configuration);
 
             var encryptionKey = GeneratorHelper.GenerateEncryptionKey(_configuration);
+            Console.WriteLine($"Encryption key: {encryptionKey}");
 
             var saltBytes = new byte[16];
             RandomNumberGenerator.Fill(saltBytes);
@@ -102,11 +103,12 @@ namespace CloudNext.Services
 
             // Generate recovery key without hex encoding
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
-
             Console.WriteLine($"Recovery key: {recoveryKey}");
+            var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
+            Console.WriteLine($"Recovery key hex: {recoveryKeyHex}");
 
             // Encrypt the recovery key directly (no hex encoding)
-            var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(recoveryKey, encryptionKey);
+            var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
 
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
             var encryptedRecoveryKey = EncryptionHelper.EncryptData(recoveryKey, rootKey);
@@ -226,54 +228,73 @@ namespace CloudNext.Services
 
             var resetToken = JwtTokenHelper.GeneratePasswordResetToken(user, _configuration);
             Console.WriteLine($"Reset Token: {resetToken}");
-            var resetUrl = $"http://localhost:5074/api/Users/reset-password?token={resetToken}";
+            var resetUrl = $"https://localhost:7245/api/Users/reset-password?token={resetToken}";
 
             await _smtpService.SendPasswordResetMailAsync(email, resetUrl);
 
             return "Password reset email sent.";
         }
 
-        public async Task<string> ResetPasswordAsync(string token, string newPassword, string recoveryKey)
+        public async Task<string> ResetPasswordAsync(string token, string newPassword, string suppliedRecoveryKey)
         {
-            // Validate the JWT token and extract user information from it
+            // 1. Validate the JWT and load the user
             var principal = JwtTokenHelper.ValidateResetPasswordToken(token, _configuration);
             if (principal == null)
                 return "Invalid or expired reset token.";
 
-            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userIdClaim == null)
                 return "Invalid token claims.";
 
-            var userId = Guid.Parse(userIdClaim.Value);
+            var userId = Guid.Parse(userIdClaim);
             var user = await _userRepository.GetUserByIdAsync(userId);
             if (user == null)
                 return "User not found.";
 
-            // Decrypt the recovery key using the root key
-            var decryptedRecoveryKey = EncryptionHelper.DecryptData(user.EncryptedRecoveryKey, _configuration["Security:RootKey"]);
+            // 2. Recover the stored recovery key by decrypting with your RootKey
+            var rootKey = _configuration["Security:RootKey"]
+                           ?? throw new InvalidOperationException("Root key is missing.");
+            var storedRecoveryKey = EncryptionHelper.DecryptData(user.EncryptedRecoveryKey!, rootKey);
 
-            // Verify that the provided recovery key matches the stored (decrypted) recovery key
-            if (recoveryKey != decryptedRecoveryKey)
+            // 2. Verify the supplied recovery key
+            if (suppliedRecoveryKey != storedRecoveryKey)
                 return "Recovery key is incorrect.";
 
-            // Derive a new encryption key from the new password and user's salt
-            var saltBytes = Convert.FromHexString(user.PasswordSalt);
-            var derivedKey = GeneratorHelper.DeriveKeyFromPassword(newPassword, Convert.ToHexString(saltBytes));
+            // 3. Convert that plain-text recovery key into a hex string so it works with DecryptData
+            var recoveryKeyBytes = Encoding.UTF8.GetBytes(storedRecoveryKey);
+            var recoveryKeyHex = Convert.ToHexString(recoveryKeyBytes);
 
-            // Encrypt the new user key (with the derived key) and update it in the user record
-            var encryptedUserKey = EncryptionHelper.EncryptData(user.EncryptedUserKey, derivedKey);
-            user.EncryptedUserKey = encryptedUserKey;
+            // 4. Now decrypt your encrypted-user-key blob using that hex-encoded key
+            var originalEncKey = EncryptionHelper.DecryptData(
+                user.RecoveryEncryptedUserKey!,
+                recoveryKeyHex
+            );
 
-            // Hash the new password and update the password hash
+            // 5. Derive a new key from the new password + existing salt
+            var saltHex = user.PasswordSalt!;
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(newPassword, saltHex);
+
+            // 6. Re-encrypt the same originalEncKey with the new password-derived key
+            user.EncryptedUserKey = EncryptionHelper.EncryptData(originalEncKey, derivedKey);
+
+            // 7. Rotate the recovery key the same way you do in Register:
+            var newRecoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
+            var newRecoveryKeyHexBytes = Encoding.UTF8.GetBytes(newRecoveryKey);
+            var newRecoveryKeyHex = Convert.ToHexString(newRecoveryKeyHexBytes);
+
+            //   a) store encryptionKey encrypted under the new recovery key
+            user.RecoveryEncryptedUserKey
+                = EncryptionHelper.EncryptData(originalEncKey, newRecoveryKeyHex);
+
+            //   b) store new recovery key encrypted under the root key
+            user.EncryptedRecoveryKey
+                = EncryptionHelper.EncryptData(newRecoveryKey, rootKey);
+
+            // 8. Finally, hash + update the password
             user.PasswordHash = HashPassword(newPassword);
+            // (keep saltHex the same)
 
-            // Optionally, update the salt (if you plan to change the salt as well, but here we keep it the same)
-            user.PasswordSalt = Convert.ToHexString(saltBytes);
-
-            // Save the updated user data
             await _userRepository.UpdateUserAsync(user);
-
-            // Return a success message after the password reset
             return "Password reset successfully.";
         }
 
