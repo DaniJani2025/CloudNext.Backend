@@ -227,7 +227,8 @@ namespace CloudNext.Services
                 return "User with this email doesn't exist.";
 
             var resetToken = JwtTokenHelper.GeneratePasswordResetToken(user, _configuration);
-            var resetUrl = $"https://localhost:5173/reset-password?token={resetToken}";
+            var AppBaseUrl = _configuration["AppSettings:AppBaseUrl"];
+            var resetUrl = $"{AppBaseUrl}/reset-password?token={resetToken}";
             Console.WriteLine($"Reset Url: {resetUrl}");
 
             await _smtpService.SendPasswordResetMailAsync(email, resetUrl);
