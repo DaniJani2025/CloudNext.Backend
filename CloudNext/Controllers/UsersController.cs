@@ -121,15 +121,23 @@ namespace CloudNext.Controllers
         [HttpPatch("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
         {
-            var result = await _userService.ResetPasswordAsync(request.Token, request.NewPassword, request.RecoveryKey);
+            var result = await _userService
+                .ResetPasswordAsync(request.Token, request.NewPassword, request.RecoveryKey);
 
-            if (result == "Invalid or expired reset token.")
-                return BadRequest(ApiResponse<string>.ErrorResponse(result));
+            if (!result.IsSuccess)
+            {
+                return BadRequest(
+                    ApiResponse<string>.ErrorResponse(result.ErrorMessage)
+                );
+            }
 
-            if (result == "User not found.")
-                return NotFound(ApiResponse<string>.ErrorResponse(result));
+            var responseDto = new ResetPasswordResponseDto
+            {
+                Message = result.ErrorMessage,
+                NewRecoveryKey = result.NewRecoveryKey
+            };
 
-            return Ok(ApiResponse<string>.SuccessResponse(result));
+            return Ok(ApiResponse<ResetPasswordResponseDto>.SuccessResponse(responseDto));
         }
     }
 }

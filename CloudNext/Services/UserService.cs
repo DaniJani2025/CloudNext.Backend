@@ -237,67 +237,52 @@ namespace CloudNext.Services
             return "Password reset email sent.";
         }
 
-        public async Task<string> ResetPasswordAsync(string token, string newPassword, string suppliedRecoveryKey)
+        public async Task<ResetPasswordResult> ResetPasswordAsync(string token, string newPassword, string suppliedRecoveryKey)
         {
-            // 1. Validate the JWT and load the user
             var principal = JwtTokenHelper.ValidateResetPasswordToken(token, _configuration);
             if (principal == null)
-                return "Invalid or expired reset token.";
+                return new ResetPasswordResult { ErrorMessage = "Invalid or expired reset token." };
 
             var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userIdClaim == null)
-                return "Invalid token claims.";
+                return new ResetPasswordResult { ErrorMessage = "Invalid token claims." };
 
-            var userId = Guid.Parse(userIdClaim);
-            var user = await _userRepository.GetUserByIdAsync(userId);
+            var user = await _userRepository.GetUserByIdAsync(Guid.Parse(userIdClaim));
             if (user == null)
-                return "User not found.";
+                return new ResetPasswordResult { ErrorMessage = "User not found." };
 
-            // 2. Recover the stored recovery key by decrypting with your RootKey
             var rootKey = _configuration["Security:RootKey"]
-                           ?? throw new InvalidOperationException("Root key is missing.");
+                          ?? throw new InvalidOperationException("Root key is missing.");
             var storedRecoveryKey = EncryptionHelper.DecryptData(user.EncryptedRecoveryKey!, rootKey);
 
-            // 2. Verify the supplied recovery key
             if (suppliedRecoveryKey != storedRecoveryKey)
-                return "Recovery key is incorrect.";
+                return new ResetPasswordResult { ErrorMessage = "Recovery key is incorrect." };
 
-            // 3. Convert that plain-text recovery key into a hex string so it works with DecryptData
             var recoveryKeyBytes = Encoding.UTF8.GetBytes(storedRecoveryKey);
             var recoveryKeyHex = Convert.ToHexString(recoveryKeyBytes);
 
-            // 4. Now decrypt your encrypted-user-key blob using that hex-encoded key
             var originalEncKey = EncryptionHelper.DecryptData(
-                user.RecoveryEncryptedUserKey!,
-                recoveryKeyHex
+                user.RecoveryEncryptedUserKey!, recoveryKeyHex
             );
 
-            // 5. Derive a new key from the new password + existing salt
-            var saltHex = user.PasswordSalt!;
-            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(newPassword, saltHex);
-
-            // 6. Re-encrypt the same originalEncKey with the new password-derived key
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(newPassword, user.PasswordSalt!);
             user.EncryptedUserKey = EncryptionHelper.EncryptData(originalEncKey, derivedKey);
 
-            // 7. Rotate the recovery key the same way you do in Register:
             var newRecoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
-            var newRecoveryKeyHexBytes = Encoding.UTF8.GetBytes(newRecoveryKey);
-            var newRecoveryKeyHex = Convert.ToHexString(newRecoveryKeyHexBytes);
+            var newRecoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(newRecoveryKey));
 
-            //   a) store encryptionKey encrypted under the new recovery key
-            user.RecoveryEncryptedUserKey
-                = EncryptionHelper.EncryptData(originalEncKey, newRecoveryKeyHex);
+            user.RecoveryEncryptedUserKey = EncryptionHelper.EncryptData(originalEncKey, newRecoveryKeyHex);
+            user.EncryptedRecoveryKey = EncryptionHelper.EncryptData(newRecoveryKey, rootKey);
 
-            //   b) store new recovery key encrypted under the root key
-            user.EncryptedRecoveryKey
-                = EncryptionHelper.EncryptData(newRecoveryKey, rootKey);
-
-            // 8. Finally, hash + update the password
             user.PasswordHash = HashPassword(newPassword);
-            // (keep saltHex the same)
-
             await _userRepository.UpdateUserAsync(user);
-            return "Password reset successfully.";
+
+            return new ResetPasswordResult
+            {
+                IsSuccess = true,
+                NewRecoveryKey = newRecoveryKey,
+                ErrorMessage = "Password reset successfully."
+            };
         }
 
         public async Task<bool> DeleteUserAsync(Guid userId)
