@@ -81,7 +81,7 @@ namespace CloudNext.Services
             return (user, token, "Login successful");
         }
 
-        public async Task<User?> RegisterUserAsync(string email, string password)
+        public async Task<RegisterResult?> RegisterUserAsync(string email, string password)
         {
             if (await _userRepository.GetUserByEmailAsync(email) != null)
                 return null;
@@ -101,13 +101,10 @@ namespace CloudNext.Services
             var derivedKey = EncryptionHelper.DeriveKeyFromPassword(password, saltHex);
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
-            // Generate recovery key without hex encoding
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
             Console.WriteLine($"Recovery key: {recoveryKey}");
             var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
-            Console.WriteLine($"Recovery key hex: {recoveryKeyHex}");
 
-            // Encrypt the recovery key directly (no hex encoding)
             var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
 
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
@@ -150,7 +147,11 @@ namespace CloudNext.Services
 
             await _userFolderRepository.AddFolderAsync(newUserFolder);
 
-            return newUser;
+            return new RegisterResult
+            {
+                User = newUser,
+                RecoveryKey = recoveryKey
+            };
         }
 
         public async Task<string?> VerifyEmailAsync(string token)
