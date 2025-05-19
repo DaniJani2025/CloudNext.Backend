@@ -60,16 +60,17 @@ namespace CloudNext.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
-            var user = await _userService.RegisterUserAsync(request.Email, request.Password);
+            var result = await _userService.RegisterUserAsync(request.Email, request.Password);
 
-            if (user == null)
+            if (result == null)
                 return Conflict(ApiResponse<RegisterResponseDto>.ErrorResponse("User already exists"));
 
             var response = new RegisterResponseDto
             {
-                UserId = user.Id,
-                Email = user.Email,
-                Message = "User registered successfully"
+                UserId = result.User.Id,
+                Email = result.User.Email,
+                Message = "User registered successfully",
+                RecoveryKey = result.RecoveryKey
             };
 
             return Ok(ApiResponse<RegisterResponseDto>.SuccessResponse(response));
@@ -104,6 +105,39 @@ namespace CloudNext.Controllers
             };
 
             return Ok(ApiResponse<TokenRefreshResponseDto>.SuccessResponse(response));
+        }
+
+        [HttpPost("request-password-reset")]
+        public async Task<IActionResult> RequestPasswordReset([FromBody] RequestPasswordResetDto request)
+        {
+            var result = await _userService.RequestPasswordResetAsync(request.Email);
+
+            if (result == "User with this email doesn't exist.")
+                return NotFound(ApiResponse<string>.ErrorResponse(result));
+
+            return Ok(ApiResponse<string>.SuccessResponse(result));
+        }
+
+        [HttpPatch("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
+        {
+            var result = await _userService
+                .ResetPasswordAsync(request.Token, request.NewPassword, request.RecoveryKey);
+
+            if (!result.IsSuccess)
+            {
+                return BadRequest(
+                    ApiResponse<string>.ErrorResponse(result.ErrorMessage)
+                );
+            }
+
+            var responseDto = new ResetPasswordResponseDto
+            {
+                Message = result.ErrorMessage,
+                NewRecoveryKey = result.NewRecoveryKey
+            };
+
+            return Ok(ApiResponse<ResetPasswordResponseDto>.SuccessResponse(responseDto));
         }
     }
 }

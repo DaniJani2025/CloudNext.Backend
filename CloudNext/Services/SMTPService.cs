@@ -140,5 +140,45 @@ namespace CloudNext.Services
                 }
             });
         }
+
+        public async Task SendPasswordResetMailAsync(string recipientEmail, string resetUrl)
+        {
+            if (!_enableEmail) return;
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates", "password_reset_mail_template.html");
+                    string htmlTemplate = await File.ReadAllTextAsync(templatePath);
+
+                    string emailBody = htmlTemplate
+                        .Replace("{{resetUrl}}", resetUrl)
+                        .Replace("{{year}}", DateTime.Now.Year.ToString());
+
+                    using SmtpClient smtpClient = new(_host, _port)
+                    {
+                        EnableSsl = true,
+                        UseDefaultCredentials = false,
+                        Credentials = new NetworkCredential(_username, _password)
+                    };
+
+                    using MailMessage mail = new()
+                    {
+                        From = new MailAddress(_username, _appName),
+                        Subject = "Reset Your Password",
+                        Body = emailBody,
+                        IsBodyHtml = true
+                    };
+                    mail.To.Add(recipientEmail);
+
+                    await smtpClient.SendMailAsync(mail);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send password reset email: {ex.Message}");
+                }
+            });
+        }
     }
 }

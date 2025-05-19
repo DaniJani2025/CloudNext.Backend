@@ -80,8 +80,8 @@ namespace CloudNext.Services
 
             return (user, token, "Login successful");
         }
-        
-        public async Task<User?> RegisterUserAsync(string email, string password)
+
+        public async Task<RegisterResult?> RegisterUserAsync(string email, string password)
         {
             if (await _userRepository.GetUserByEmailAsync(email) != null)
                 return null;
@@ -92,6 +92,7 @@ namespace CloudNext.Services
             var verificationURL = GeneratorHelper.GenerateRegistrationUrl(email, _configuration);
 
             var encryptionKey = GeneratorHelper.GenerateEncryptionKey(_configuration);
+            Console.WriteLine($"Encryption key: {encryptionKey}");
 
             var saltBytes = new byte[16];
             RandomNumberGenerator.Fill(saltBytes);
@@ -101,8 +102,9 @@ namespace CloudNext.Services
             var encryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, derivedKey);
 
             var recoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
-
+            Console.WriteLine($"Recovery key: {recoveryKey}");
             var recoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(recoveryKey));
+
             var recoveryEncryptedUserKey = EncryptionHelper.EncryptData(encryptionKey, recoveryKeyHex);
 
             var rootKey = _configuration["Security:RootKey"] ?? throw new InvalidOperationException("Root key is missing.");
@@ -145,7 +147,11 @@ namespace CloudNext.Services
 
             await _userFolderRepository.AddFolderAsync(newUserFolder);
 
-            return newUser;
+            return new RegisterResult
+            {
+                User = newUser,
+                RecoveryKey = recoveryKey
+            };
         }
 
         public async Task<string?> VerifyEmailAsync(string token)
@@ -213,6 +219,70 @@ namespace CloudNext.Services
             user.Email = newEmail;
             await _userRepository.UpdateUserAsync(user);
             return true;
+        }
+
+        public async Task<string> RequestPasswordResetAsync(string email)
+        {
+            var user = await _userRepository.GetUserByEmailAsync(email);
+            if (user == null)
+                return "User with this email doesn't exist.";
+
+            var resetToken = JwtTokenHelper.GeneratePasswordResetToken(user, _configuration);
+            var AppBaseUrl = _configuration["AppSettings:AppBaseUrl"];
+            var resetUrl = $"{AppBaseUrl}/reset-password?token={resetToken}";
+            Console.WriteLine($"Reset Url: {resetUrl}");
+
+            await _smtpService.SendPasswordResetMailAsync(email, resetUrl);
+
+            return "Password reset email sent.";
+        }
+
+        public async Task<ResetPasswordResult> ResetPasswordAsync(string token, string newPassword, string suppliedRecoveryKey)
+        {
+            var principal = JwtTokenHelper.ValidateResetPasswordToken(token, _configuration);
+            if (principal == null)
+                return new ResetPasswordResult { ErrorMessage = "Invalid or expired reset token." };
+
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null)
+                return new ResetPasswordResult { ErrorMessage = "Invalid token claims." };
+
+            var user = await _userRepository.GetUserByIdAsync(Guid.Parse(userIdClaim));
+            if (user == null)
+                return new ResetPasswordResult { ErrorMessage = "User not found." };
+
+            var rootKey = _configuration["Security:RootKey"]
+                          ?? throw new InvalidOperationException("Root key is missing.");
+            var storedRecoveryKey = EncryptionHelper.DecryptData(user.EncryptedRecoveryKey!, rootKey);
+
+            if (suppliedRecoveryKey != storedRecoveryKey)
+                return new ResetPasswordResult { ErrorMessage = "Recovery key is incorrect." };
+
+            var recoveryKeyBytes = Encoding.UTF8.GetBytes(storedRecoveryKey);
+            var recoveryKeyHex = Convert.ToHexString(recoveryKeyBytes);
+
+            var originalEncKey = EncryptionHelper.DecryptData(
+                user.RecoveryEncryptedUserKey!, recoveryKeyHex
+            );
+
+            var derivedKey = EncryptionHelper.DeriveKeyFromPassword(newPassword, user.PasswordSalt!);
+            user.EncryptedUserKey = EncryptionHelper.EncryptData(originalEncKey, derivedKey);
+
+            var newRecoveryKey = GeneratorHelper.GenerateRecoveryKey(_configuration);
+            var newRecoveryKeyHex = Convert.ToHexString(Encoding.UTF8.GetBytes(newRecoveryKey));
+
+            user.RecoveryEncryptedUserKey = EncryptionHelper.EncryptData(originalEncKey, newRecoveryKeyHex);
+            user.EncryptedRecoveryKey = EncryptionHelper.EncryptData(newRecoveryKey, rootKey);
+
+            user.PasswordHash = HashPassword(newPassword);
+            await _userRepository.UpdateUserAsync(user);
+
+            return new ResetPasswordResult
+            {
+                IsSuccess = true,
+                NewRecoveryKey = newRecoveryKey,
+                ErrorMessage = "Password reset successfully."
+            };
         }
 
         public async Task<bool> DeleteUserAsync(Guid userId)

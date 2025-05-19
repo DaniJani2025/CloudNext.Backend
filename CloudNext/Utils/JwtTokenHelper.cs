@@ -136,5 +136,54 @@ namespace CloudNext.Utils
                 return null;
             }
         }
+
+        public static string GeneratePasswordResetToken(User user, IConfiguration configuration)
+        {
+            var key = GetSecurityKey(configuration);
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email)
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: configuration["Jwt:Issuer"],
+                audience: configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(1),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public static ClaimsPrincipal? ValidateResetPasswordToken(string token, IConfiguration configuration)
+        {
+            var key = GetSecurityKey(configuration);
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    RequireExpirationTime = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }
