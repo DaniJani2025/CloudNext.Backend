@@ -42,7 +42,7 @@ namespace CloudNext.Controllers
 
         [Authorize]
         [HttpPost("logout")]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
@@ -50,7 +50,7 @@ namespace CloudNext.Controllers
 
             var userId = Guid.Parse(userIdClaim.Value);
 
-            _userService.Logout(userId);
+            await _userService.Logout(userId);
 
             Response.Cookies.Delete("refreshToken");
 

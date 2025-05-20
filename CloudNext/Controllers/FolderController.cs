@@ -26,7 +26,7 @@ namespace CloudNext.Controllers
         [HttpPost("create-folder")]
         public async Task<IActionResult> CreateFolder([FromBody] CreateFolderDto dto)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(dto.UserId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(dto.UserId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -48,7 +48,7 @@ namespace CloudNext.Controllers
         [HttpPost("download")]
         public async Task<IActionResult> DownloadFolder([FromBody] FolderDownloadRequestDto dto)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(dto.UserId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(dto.UserId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -67,7 +67,7 @@ namespace CloudNext.Controllers
         [HttpPost("upload")]
         public async Task<IActionResult> UploadFolder([FromForm] FolderUploadDto dto)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(dto.UserId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(dto.UserId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -93,7 +93,7 @@ namespace CloudNext.Controllers
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetAllFolders([FromQuery] Guid userId, [FromQuery] Guid? folderId)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(userId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 
@@ -111,7 +111,7 @@ namespace CloudNext.Controllers
         [HttpGet("structure")]
         public async Task<IActionResult> GetFullFolderStructure([FromQuery] Guid userId)
         {
-            var encryptionKey = _userSessionService.GetEncryptionKey(userId);
+            var encryptionKey = await _userSessionService.GetEncryptionKey(userId);
             if (encryptionKey == null)
                 return Unauthorized("Session invalid or expired");
 

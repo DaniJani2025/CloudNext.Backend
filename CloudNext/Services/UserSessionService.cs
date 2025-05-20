@@ -1,50 +1,65 @@
-﻿using System.Collections.Concurrent;
-using System.Security.Claims;
+﻿using System.Text.Json;
 using CloudNext.Interfaces;
 using Microsoft.AspNetCore.Http;
+using StackExchange.Redis;
 
 namespace CloudNext.Services
 {
     public class UserSessionService : IUserSessionService
     {
-        private static readonly ConcurrentDictionary<Guid, (string Key, string IP, string Agent)> _userSessions = new();
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IDatabase _redis;
 
-        public UserSessionService(IHttpContextAccessor httpContextAccessor)
+        public UserSessionService(IHttpContextAccessor httpContextAccessor, IConnectionMultiplexer redis)
         {
             _httpContextAccessor = httpContextAccessor;
+            _redis = redis.GetDatabase();
         }
 
-        public void SetSession(Guid userId, string key)
+        public async Task SetSession(Guid userId, string key)
         {
             var context = _httpContextAccessor.HttpContext;
             var ipAddress = context?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var userAgent = context?.Request.Headers.UserAgent.ToString() ?? "unknown";
 
-            _userSessions[userId] = (key, ipAddress, userAgent);
+            var session = new UserSession { Key = key, IP = ipAddress, Agent = userAgent };
+            var json = JsonSerializer.Serialize(session);
+            await _redis.StringSetAsync(GetRedisKey(userId), json);
         }
 
-        public string? GetEncryptionKey(Guid userId)
+        public async Task<string?> GetEncryptionKey(Guid userId)
         {
             var context = _httpContextAccessor.HttpContext;
             var currentIp = context?.Connection.RemoteIpAddress?.ToString();
             var currentUserAgent = context?.Request.Headers.UserAgent.ToString();
-            
+
             if (currentIp == null || currentUserAgent == null)
                 return null;
 
-            if (_userSessions.TryGetValue(userId, out var session))
-            {
-                if (session.IP == currentIp && session.Agent == currentUserAgent)
-                    return session.Key;
-            }
+            var json = await _redis.StringGetAsync(GetRedisKey(userId));
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            var session = JsonSerializer.Deserialize<UserSession>(json!);
+
+            if (session != null && session.IP == currentIp && session.Agent == currentUserAgent)
+                return session.Key;
 
             return null;
         }
 
-        public void RemoveSession(Guid userId)
+        public async Task RemoveSession(Guid userId)
         {
-            _userSessions.TryRemove(userId, out _);
+            await _redis.KeyDeleteAsync(GetRedisKey(userId));
+        }
+
+        private static string GetRedisKey(Guid userId) => $"userSession:{userId}";
+
+        private class UserSession
+        {
+            public string Key { get; set; } = default!;
+            public string IP { get; set; } = default!;
+            public string Agent { get; set; } = default!;
         }
     }
 }
