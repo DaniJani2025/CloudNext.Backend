@@ -19,7 +19,6 @@ builder.WebHost.ConfigureKestrel((context, options) =>
     var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
     var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
 
-    options.ListenAnyIP(5074);
     options.ListenAnyIP(7245, listenOptions =>
     {
         listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
