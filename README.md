@@ -68,11 +68,15 @@ The backend follows a layered architecture:
 
 Security-sensitive operations are isolated within the service layer to maintain clear separation of concerns.
 
+### System Architecture Diagram
+
+![System Architecture](docs/CloudNext-System-Architecture.png)
+
 ---
 
 ## Database Schema
 
-
+![Database Schema](docs/CloudNext-DB-Schema.png)
 
 The database maintains structured relationships between users, files, and folders to support hierarchical storage and secure ownership mapping.
 
@@ -92,9 +96,16 @@ The backend does not provide recovery mechanisms for lost encryption keys.
 
 ---
 
-## Running Locally
+## Running the App
 
-### Restore dependencies
+1. Restore dependencies:
 
 ```bash
 dotnet restore
+```
+
+2. Run the App:
+
+```bash
+dotnet run
+```
