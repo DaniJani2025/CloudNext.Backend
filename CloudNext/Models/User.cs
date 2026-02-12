@@ -5,6 +5,10 @@
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
 
+        public bool IsActive { get; set; } = true;
+        public DateTime? DeactivatedAt { get; set; }
+        public DateTime? ScheduledDeletionAt { get; set; }
+
         public List<UserFolder> Folders { get; set; } = new();
         public List<UserFile> Files { get; set; } = new();
 

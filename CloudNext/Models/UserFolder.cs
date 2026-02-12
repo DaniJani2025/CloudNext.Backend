@@ -1,6 +1,6 @@
 ﻿namespace CloudNext.Models
 {
-    public class UserFolder : BaseEntity
+    public class UserFolder : SoftDeletableEntity
     {
         public string Name { get; set; } = string.Empty;
         public Guid UserId { get; set; }  // Owner Foreign Key

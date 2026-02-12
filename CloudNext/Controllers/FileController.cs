@@ -94,6 +94,12 @@ namespace CloudNext.Controllers
             return File(data, contentType, fileName);
         }
 
+        [HttpDelete("delete")]
+        public async Task<IActionResult> DeleteFiles([FromBody] FileDeleteRequestDto request)
+        {
+            return Ok();
+        }
+
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetFolderThumbnails([FromQuery] Guid userId, [FromQuery] Guid? folderId)
         {

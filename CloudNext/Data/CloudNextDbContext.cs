@@ -11,11 +11,15 @@ namespace CloudNext.Data
         public DbSet<UserFile> UserFiles { get; set; }
         public DbSet<UserFolder> UserFolders { get; set; }
         public DbSet<SharedFile> SharedFiles { get; set; }
-        public DbSet<SharedFolder> SharedFolders { get; set; } // Added SharedFolder
-        public DbSet<Trash> Trashes { get; set; }
+        public DbSet<SharedFolder> SharedFolders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<UserFile>().HasQueryFilter(f => !f.IsDeleted);
+            modelBuilder.Entity<UserFolder>().HasQueryFilter(f => !f.IsDeleted);
+
             // User-UserFolder one-to-many relationship
             modelBuilder.Entity<UserFolder>()
                 .HasOne(f => f.User)
@@ -80,25 +84,6 @@ namespace CloudNext.Data
                 .HasOne(sf => sf.SharedWithUser)
                 .WithMany()
                 .HasForeignKey(sf => sf.SharedWithUserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Trash relationships
-            modelBuilder.Entity<Trash>()
-                .HasOne(t => t.File)
-                .WithMany()
-                .HasForeignKey(t => t.FileId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Trash>()
-                .HasOne(t => t.Folder)
-                .WithMany()
-                .HasForeignKey(t => t.FolderId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Trash>()
-                .HasOne(t => t.User)
-                .WithMany()
-                .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

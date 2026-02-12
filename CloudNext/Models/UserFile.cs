@@ -1,6 +1,6 @@
 ﻿namespace CloudNext.Models
 {
-    public class UserFile : BaseEntity
+    public class UserFile : SoftDeletableEntity
     {
         public string OriginalName { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
