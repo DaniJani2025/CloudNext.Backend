@@ -49,62 +49,75 @@ namespace CloudNext.Utils
             return new string(keyChars);
         }
 
-        public async static Task GenerateThumbnail(byte[] fileBytes, string contentType, string thumbnailPath)
+        public async static Task<byte[]?> GenerateThumbnailBytes(byte[] fileBytes, string contentType)
         {
             if (contentType.StartsWith("image/"))
             {
                 if (!Constants.Media.SupportedImageTypes.Contains(contentType.ToLower()))
-                    return;
+                    return null;
 
                 using var image = SixLabors.ImageSharp.Image.Load(fileBytes);
-                var thumbnail = image.Clone(ctx => ctx.Resize(new ResizeOptions
+                using var outputStream = new MemoryStream();
+
+                image.Mutate(ctx => ctx.Resize(new ResizeOptions
                 {
                     Mode = ResizeMode.Max,
                     Size = new Size(300, 300)
                 }));
-                thumbnail.Save(thumbnailPath);
+
+                await image.SaveAsPngAsync(outputStream);
+                return outputStream.ToArray();
             }
-            else if (contentType.StartsWith("video/"))
+
+            if (contentType.StartsWith("video/"))
             {
-                // strip any “; codecs=” suffix
                 var mediaType = contentType.Split(';')[0].Trim().ToLowerInvariant();
                 if (!Constants.Media.SupportedVideoTypes.Contains(mediaType))
-                    return;
+                    return null;
 
-                // write to temp file with correct extension
                 var ext = mediaType switch
                 {
                     "video/mp4" => ".mp4",
                     "video/avi" => ".avi",
-                    _ => Path.GetExtension(thumbnailPath)
+                    _ => ".mp4"
                 };
+
                 var tempVideoPath = Path.ChangeExtension(Path.GetTempFileName(), ext);
-                File.WriteAllBytes(tempVideoPath, fileBytes);
+                var tempThumbnailPath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
+
+                await File.WriteAllBytesAsync(tempVideoPath, fileBytes);
 
                 try
                 {
                     var startInfo = new ProcessStartInfo
                     {
-                        FileName = "ffmpeg",   // or full path
-                        Arguments = $"-hide_banner -loglevel error -i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{thumbnailPath}\" -y",
+                        FileName = "ffmpeg",
+                        Arguments = $"-hide_banner -loglevel error -i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{tempThumbnailPath}\" -y",
                         RedirectStandardError = true,
                         UseShellExecute = false,
                         CreateNoWindow = true
                     };
 
                     using var process = Process.Start(startInfo)!;
-                    // read the single stderr stream so we don’t deadlock
                     var error = await process.StandardError.ReadToEndAsync();
                     process.WaitForExit();
 
                     if (process.ExitCode != 0)
                         throw new InvalidOperationException($"FFmpeg error (code {process.ExitCode}): {error}");
+
+                    return await File.ReadAllBytesAsync(tempThumbnailPath);
                 }
                 finally
                 {
-                    File.Delete(tempVideoPath);
+                    if (File.Exists(tempVideoPath))
+                        File.Delete(tempVideoPath);
+
+                    if (File.Exists(tempThumbnailPath))
+                        File.Delete(tempThumbnailPath);
                 }
             }
+
+            return null;
         }
     }
 }

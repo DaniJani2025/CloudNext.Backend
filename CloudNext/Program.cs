@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
+using Amazon.S3;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,8 +65,20 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IUserFileRepository, UserFileRepository>();
 builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
-
 builder.Services.AddScoped<SMTPService>();
+
+var provider = builder.Configuration["Storage:Provider"];
+
+if (provider == "S3")
+{
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<IAmazonS3>();
+    builder.Services.AddScoped<IStorageService, S3StorageService>();
+}
+else
+{
+    builder.Services.AddScoped<IStorageService, LocalStorageService>();
+}
 
 builder.Services.AddHttpContextAccessor();
 

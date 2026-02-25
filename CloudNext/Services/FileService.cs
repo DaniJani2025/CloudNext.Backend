@@ -16,24 +16,34 @@ namespace CloudNext.Services
         private readonly IUserSessionService _userSessionService;
         private readonly IUserFileRepository _fileRepository;
         private readonly IUserFolderRepository _userFolderRepository;
+        private readonly IStorageService _storageService;
 
-        public FileService(IUserSessionService userSessionService, IUserFileRepository fileRepository, IUserFolderRepository userFolderRepository)
+        public FileService(
+            IUserSessionService userSessionService, 
+            IUserFileRepository fileRepository, 
+            IUserFolderRepository userFolderRepository,
+            IStorageService storageService)
         {
             _userSessionService = userSessionService;
             _fileRepository = fileRepository;
             _userFolderRepository = userFolderRepository;
-            _userFolderRepository = userFolderRepository;
+            _storageService = storageService;
         }
 
-        public async Task<UserFile> SaveEncryptedFileAsync(IFormFile file, Guid? parentFolderId, Guid userId)
+        public async Task<UserFile> SaveEncryptedFileAsync(
+           IFormFile file,
+           Guid? parentFolderId,
+           Guid userId)
         {
             UserFolder? parentFolder;
             string folderVirtualPath;
 
             if (parentFolderId.HasValue)
             {
-                parentFolder = await _userFolderRepository.GetFolderByIdAsync(parentFolderId.Value)
-                              ?? throw new InvalidOperationException("Parent folder not found.");
+                parentFolder = await _userFolderRepository
+                    .GetFolderByIdAsync(parentFolderId.Value)
+                    ?? throw new InvalidOperationException("Parent folder not found.");
+
                 folderVirtualPath = parentFolder.VirtualPath;
             }
             else
@@ -44,39 +54,65 @@ namespace CloudNext.Services
 
             var userKey = await _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
-                throw new InvalidOperationException("Encryption key not found for the user.");
-
-            var folderPath = Path.Combine(AppContext.BaseDirectory, "Documents", userId.ToString(), folderVirtualPath);
-            Directory.CreateDirectory(folderPath);
+                throw new InvalidOperationException("Encryption key not found.");
 
             var fileId = Guid.NewGuid();
             var storedFileName = $"{fileId}.dat";
-            var fullPhysicalPath = Path.Combine(folderPath, storedFileName);
 
-            using var memoryStream = new MemoryStream();
-            await file.CopyToAsync(memoryStream);
-            byte[] fileBytes = memoryStream.ToArray();
+            var objectKey = Path.Combine(
+                userId.ToString(),
+                folderVirtualPath,
+                storedFileName
+            ).Replace("\\", "/");
 
-            string contentType = file.ContentType;
+            var contentType = file.ContentType;
 
-            if (contentType.StartsWith("image/") || contentType.StartsWith("video/"))
+            // -------- Thumbnail Section --------
+            if (!string.IsNullOrEmpty(contentType) &&
+                (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+                 contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)))
             {
-                var thumbnailFolderPath = Path.Combine(folderPath, ".thumbnails");
-                Directory.CreateDirectory(thumbnailFolderPath);
-                var thumbnailPath = Path.Combine(thumbnailFolderPath, $"{fileId}.png");
+                using var thumbStream = file.OpenReadStream();
+                using var memory = new MemoryStream();
 
-                await GeneratorHelper.GenerateThumbnail(fileBytes, contentType, thumbnailPath);
+                await thumbStream.CopyToAsync(memory);
+
+                var thumbnailBytes = await GeneratorHelper
+                    .GenerateThumbnailBytes(memory.ToArray(), contentType);
+
+                if (thumbnailBytes != null)
+                {
+                    var thumbnailKey = Path.Combine(
+                        userId.ToString(),
+                        folderVirtualPath,
+                        ".thumbnails",
+                        $"{fileId}.png"
+                    ).Replace("\\", "/");
+
+                    using var thumbnailStream = new MemoryStream(thumbnailBytes);
+                    await _storageService.SaveAsync(thumbnailStream, thumbnailKey);
+                }
             }
 
-            byte[] encryptedData = EncryptionHelper.EncryptFileBytes(fileBytes, userKey);
-            await File.WriteAllBytesAsync(fullPhysicalPath, encryptedData);
+            // -------- Encryption Section --------
+            using var inputStream = file.OpenReadStream();
+            using var encryptedOutput = new MemoryStream();
+
+            await EncryptionHelper.EncryptToStreamAsync(
+                inputStream,
+                encryptedOutput,
+                userKey);
+
+            encryptedOutput.Position = 0;
+
+            await _storageService.SaveAsync(encryptedOutput, objectKey);
 
             var userFile = new UserFile
             {
                 Id = fileId,
                 OriginalName = file.FileName,
                 Name = storedFileName,
-                FilePath = Path.Combine("Documents", userId.ToString(), folderVirtualPath, storedFileName).Replace("\\", "/"),
+                FilePath = objectKey,
                 Size = file.Length,
                 ContentType = contentType,
                 UserId = userId,
@@ -88,43 +124,65 @@ namespace CloudNext.Services
             return userFile;
         }
 
-        public async Task<(byte[] Data, string FileName, string ContentType)> GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId)
+        public async Task<(byte[] Data, string FileName, string ContentType)>
+            GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId)
         {
             var files = await _fileRepository.GetFilesByIdsAsync(fileIds);
             var userKey = await _userSessionService.GetEncryptionKey(userId);
 
             if (string.IsNullOrEmpty(userKey))
-                throw new InvalidOperationException("Encryption key not found for the user.");
+                throw new InvalidOperationException("Encryption key not found.");
 
             if (files.Count == 1)
             {
                 var file = files.First();
-                var path = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                var encryptedBytes = await File.ReadAllBytesAsync(path);
-                var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
 
-                return (decryptedBytes, file.OriginalName, file.ContentType);
+                using var encryptedStream =
+                    await _storageService.GetAsync(file.FilePath);
+
+                using var decryptedStream = new MemoryStream();
+
+                await EncryptionHelper.DecryptToStreamAsync(
+                    encryptedStream,
+                    decryptedStream,
+                    userKey);
+
+                return (
+                    decryptedStream.ToArray(),
+                    file.OriginalName,
+                    file.ContentType
+                );
             }
 
-            using var memoryStream = new MemoryStream();
-            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
+            using var zipMemory = new MemoryStream();
+
+            using (var archive = new ZipArchive(zipMemory, ZipArchiveMode.Create, true))
             {
                 foreach (var file in files)
                 {
-                    var path = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                    if (!File.Exists(path)) continue;
+                    using var encryptedStream =
+                        await _storageService.GetAsync(file.FilePath);
 
-                    var encryptedBytes = await File.ReadAllBytesAsync(path);
-                    var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
+                    var entry = archive.CreateEntry(
+                        file.OriginalName,
+                        CompressionLevel.Fastest);
 
-                    var entry = archive.CreateEntry(file.OriginalName, CompressionLevel.Fastest);
                     using var entryStream = entry.Open();
-                    await entryStream.WriteAsync(decryptedBytes, 0, decryptedBytes.Length);
+
+                    await EncryptionHelper.DecryptToStreamAsync(
+                        encryptedStream,
+                        entryStream,
+                        userKey);
                 }
             }
 
-            memoryStream.Position = 0;
-            return (memoryStream.ToArray(), "files.zip", "application/zip");
+            zipMemory.Position = 0;
+
+            return (
+                zipMemory.ToArray(),
+                "files.zip",
+                "application/zip"
+            );
         }
 
         public async Task<List<ThumbnailDto>> GetThumbnailsForFolderAsync(Guid? folderId, Guid userId)
