@@ -251,9 +251,13 @@ namespace CloudNext.Services
             return thumbnails;
         }
 
-        public async Task<FileStreamWithMetadataDto> StreamDecryptedVideoAsync(Guid fileId, string userId, string rangeHeader)
+        public async Task<FileStreamWithMetadataDto> StreamDecryptedVideoAsync(
+            Guid fileId,
+            string userId,
+            string rangeHeader)
         {
             var file = await _fileRepository.GetFileByIdAsync(fileId);
+
             if (file == null || file.UserId.ToString() != userId)
                 throw new FileNotFoundException("File not found or access denied.");
 
@@ -261,32 +265,43 @@ namespace CloudNext.Services
             if (string.IsNullOrEmpty(userKey))
                 throw new UnauthorizedAccessException("Encryption key not found.");
 
-            var path = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-            if (!System.IO.File.Exists(path))
-                throw new FileNotFoundException("Encrypted file not found on disk.");
+            using var encryptedStream =
+                await _storageService.GetAsync(file.FilePath);
 
-            var encryptedBytes = await System.IO.File.ReadAllBytesAsync(path);
-            var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
+            var decryptedStream = new MemoryStream();
 
-            long totalLength = decryptedBytes.Length;
+            await EncryptionHelper.DecryptToStreamAsync(
+                encryptedStream,
+                decryptedStream,
+                userKey);
+
+            decryptedStream.Position = 0;
+
+            long totalLength = decryptedStream.Length;
             long start = 0;
             long end = totalLength - 1;
 
-            if (!string.IsNullOrEmpty(rangeHeader) && rangeHeader.StartsWith("bytes="))
+            if (!string.IsNullOrEmpty(rangeHeader) &&
+                rangeHeader.StartsWith("bytes="))
             {
-                var range = rangeHeader.Substring("bytes=".Length).Split('-');
-                if (long.TryParse(range[0], out long parsedStart)) start = parsedStart;
-                if (range.Length > 1 && long.TryParse(range[1], out long parsedEnd)) end = parsedEnd;
+                var range = rangeHeader.Substring(6).Split('-');
+
+                if (long.TryParse(range[0], out var parsedStart))
+                    start = parsedStart;
+
+                if (range.Length > 1 &&
+                    long.TryParse(range[1], out var parsedEnd))
+                    end = parsedEnd;
             }
 
             end = Math.Min(end, totalLength - 1);
             long contentLength = end - start + 1;
 
-            var stream = new MemoryStream(decryptedBytes, (int)start, (int)contentLength);
+            decryptedStream.Position = start;
 
             return new FileStreamWithMetadataDto
             {
-                Stream = stream,
+                Stream = new SubStream(decryptedStream, contentLength),
                 ContentType = file.ContentType,
                 ContentLength = contentLength,
                 ContentRange = $"bytes {start}-{end}/{totalLength}"
