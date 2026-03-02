@@ -49,25 +49,25 @@ namespace CloudNext.Utils
             return Convert.ToHexString(pbkdf2.GetBytes(keySize));
         }
 
-        public static async Task EncryptToStreamAsync(
-            Stream inputStream,
-            Stream outputStream,
+        public static Stream CreateDecryptionReadStream(
+            Stream encryptedStream,
             string hexKey)
         {
-            using var aes = Aes.Create();
-            aes.Key = Convert.FromHexString(hexKey);
-            aes.GenerateIV();
+            var key = Convert.FromHexString(hexKey);
 
-            await outputStream.WriteAsync(aes.IV, 0, aes.IV.Length);
+            byte[] iv = new byte[16];
+            encryptedStream.Read(iv, 0, 16);
 
-            using var cryptoStream = new CryptoStream(
-                outputStream,
-                aes.CreateEncryptor(aes.Key, aes.IV),
-                CryptoStreamMode.Write,
-                leaveOpen: true);
+            var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
 
-            await inputStream.CopyToAsync(cryptoStream);
-            await cryptoStream.FlushFinalBlockAsync();
+            return new CryptoStream(
+                encryptedStream,
+                aes.CreateDecryptor(),
+                CryptoStreamMode.Read);
         }
 
         public static async Task DecryptToStreamAsync(

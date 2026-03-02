@@ -73,14 +73,11 @@ namespace CloudNext.Services
                  contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)))
             {
                 using var thumbStream = file.OpenReadStream();
-                using var memory = new MemoryStream();
 
-                await thumbStream.CopyToAsync(memory);
+                var thumbnailStream = await GeneratorHelper
+                    .GenerateThumbnailStreamAsync(thumbStream, contentType);
 
-                var thumbnailBytes = await GeneratorHelper
-                    .GenerateThumbnailBytes(memory.ToArray(), contentType);
-
-                if (thumbnailBytes != null)
+                if (thumbnailStream != null)
                 {
                     var thumbnailKey = Path.Combine(
                         userId.ToString(),
@@ -89,23 +86,16 @@ namespace CloudNext.Services
                         $"{fileId}.png"
                     ).Replace("\\", "/");
 
-                    using var thumbnailStream = new MemoryStream(thumbnailBytes);
                     await _storageService.SaveAsync(thumbnailStream, thumbnailKey);
                 }
             }
 
             // -------- Encryption Section --------
             using var inputStream = file.OpenReadStream();
-            using var encryptedOutput = new MemoryStream();
 
-            await EncryptionHelper.EncryptToStreamAsync(
-                inputStream,
-                encryptedOutput,
-                userKey);
-
-            encryptedOutput.Position = 0;
-
-            await _storageService.SaveAsync(encryptedOutput, objectKey);
+            await _storageService.SaveAsync(
+                new EncryptingReadStream(inputStream, userKey),
+                objectKey);
 
             var userFile = new UserFile
             {
@@ -124,7 +114,7 @@ namespace CloudNext.Services
             return userFile;
         }
 
-        public async Task<(byte[] Data, string FileName, string ContentType)>
+        public async Task<(Stream Stream, string FileName, string ContentType)>
             GetDecryptedFilesAsync(List<Guid> fileIds, Guid userId)
         {
             var files = await _fileRepository.GetFilesByIdsAsync(fileIds);
@@ -137,36 +127,30 @@ namespace CloudNext.Services
             {
                 var file = files.First();
 
-                using var encryptedStream =
-                    await _storageService.GetAsync(file.FilePath);
+                var encryptedStream = await _storageService.GetAsync(file.FilePath);
 
-                using var decryptedStream = new MemoryStream();
-
-                await EncryptionHelper.DecryptToStreamAsync(
+                var decryptStream = EncryptionHelper.CreateDecryptionReadStream(
                     encryptedStream,
-                    decryptedStream,
                     userKey);
 
                 return (
-                    decryptedStream.ToArray(),
+                    decryptStream,
                     file.OriginalName,
                     file.ContentType
                 );
             }
 
-            using var zipMemory = new MemoryStream();
+            var pipe = new System.IO.Pipelines.Pipe();
 
-            using (var archive = new ZipArchive(zipMemory, ZipArchiveMode.Create, true))
+            _ = Task.Run(async () =>
             {
+                using var archive = new ZipArchive(pipe.Writer.AsStream(), ZipArchiveMode.Create, leaveOpen: true);
+
                 foreach (var file in files)
                 {
-                    using var encryptedStream =
-                        await _storageService.GetAsync(file.FilePath);
+                    using var encryptedStream = await _storageService.GetAsync(file.FilePath);
 
-                    var entry = archive.CreateEntry(
-                        file.OriginalName,
-                        CompressionLevel.Fastest);
-
+                    var entry = archive.CreateEntry(file.OriginalName, CompressionLevel.Fastest);
                     using var entryStream = entry.Open();
 
                     await EncryptionHelper.DecryptToStreamAsync(
@@ -174,12 +158,12 @@ namespace CloudNext.Services
                         entryStream,
                         userKey);
                 }
-            }
 
-            zipMemory.Position = 0;
+                await pipe.Writer.CompleteAsync();
+            });
 
             return (
-                zipMemory.ToArray(),
+                pipe.Reader.AsStream(),
                 "files.zip",
                 "application/zip"
             );

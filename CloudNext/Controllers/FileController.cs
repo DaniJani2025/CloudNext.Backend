@@ -90,8 +90,9 @@ namespace CloudNext.Controllers
             if (request.FileIds == null || request.FileIds.Count == 0)
                 return BadRequest("No file IDs provided.");
 
-            var (data, fileName, contentType) = await _fileService.GetDecryptedFilesAsync(request.FileIds, request.UserId);
-            return File(data, contentType, fileName);
+            var result = await _fileService.GetDecryptedFilesAsync(request.FileIds, request.UserId);
+
+            return File(result.Stream, result.ContentType, result.FileName);
         }
 
         [HttpGet("GetAll")]

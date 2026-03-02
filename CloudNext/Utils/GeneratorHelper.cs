@@ -49,15 +49,18 @@ namespace CloudNext.Utils
             return new string(keyChars);
         }
 
-        public async static Task<byte[]?> GenerateThumbnailBytes(byte[] fileBytes, string contentType)
+        public static async Task<Stream?> GenerateThumbnailStreamAsync(
+            Stream inputStream,
+            string contentType)
         {
-            if (contentType.StartsWith("image/"))
+            if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
                 if (!Constants.Media.SupportedImageTypes.Contains(contentType.ToLower()))
                     return null;
 
-                using var image = SixLabors.ImageSharp.Image.Load(fileBytes);
-                using var outputStream = new MemoryStream();
+                inputStream.Position = 0;
+
+                using var image = await SixLabors.ImageSharp.Image.LoadAsync(inputStream);
 
                 image.Mutate(ctx => ctx.Resize(new ResizeOptions
                 {
@@ -65,11 +68,14 @@ namespace CloudNext.Utils
                     Size = new Size(300, 300)
                 }));
 
+                var outputStream = new MemoryStream();
                 await image.SaveAsPngAsync(outputStream);
-                return outputStream.ToArray();
+                outputStream.Position = 0;
+
+                return outputStream;
             }
 
-            if (contentType.StartsWith("video/"))
+            if (contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
             {
                 var mediaType = contentType.Split(';')[0].Trim().ToLowerInvariant();
                 if (!Constants.Media.SupportedVideoTypes.Contains(mediaType))
@@ -85,10 +91,20 @@ namespace CloudNext.Utils
                 var tempVideoPath = Path.ChangeExtension(Path.GetTempFileName(), ext);
                 var tempThumbnailPath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
 
-                await File.WriteAllBytesAsync(tempVideoPath, fileBytes);
-
                 try
                 {
+                    using (var fileStream = new FileStream(
+                        tempVideoPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.None,
+                        81920,
+                        useAsync: true))
+                    {
+                        inputStream.Position = 0;
+                        await inputStream.CopyToAsync(fileStream);
+                    }
+
                     var startInfo = new ProcessStartInfo
                     {
                         FileName = "ffmpeg",
@@ -100,12 +116,16 @@ namespace CloudNext.Utils
 
                     using var process = Process.Start(startInfo)!;
                     var error = await process.StandardError.ReadToEndAsync();
-                    process.WaitForExit();
+                    await process.WaitForExitAsync();
 
                     if (process.ExitCode != 0)
                         throw new InvalidOperationException($"FFmpeg error (code {process.ExitCode}): {error}");
 
-                    return await File.ReadAllBytesAsync(tempThumbnailPath);
+                    var thumbnailStream = new MemoryStream(
+                        await File.ReadAllBytesAsync(tempThumbnailPath));
+
+                    thumbnailStream.Position = 0;
+                    return thumbnailStream;
                 }
                 finally
                 {
