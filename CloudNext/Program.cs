@@ -15,17 +15,6 @@ using Amazon.S3;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel((context, options) =>
-{
-    var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
-    var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
-
-    options.ListenAnyIP(7245, listenOptions =>
-    {
-        listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
-    });
-});
-
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestBodySize = Constants.MaxUploadSizeInBytes;
@@ -143,17 +132,21 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseStaticFiles();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "CloudNext API v1");
         //c.InjectStylesheet("/swagger-dark.css");
     });
+
+    app.UseHttpsRedirection();
 }
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
+
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
