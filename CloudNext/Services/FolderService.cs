@@ -16,18 +16,21 @@ namespace CloudNext.Services
         private readonly IUserFileRepository _fileRepository;
         private readonly IFileService _fileService;
         private readonly IUserSessionService _userSessionService;
+        private readonly IStorageService _storageService;
 
         public FolderService(
-            IUserFolderRepository userFolderRepository, 
-            IFileService fileService, 
+            IUserFolderRepository userFolderRepository,
+            IFileService fileService,
             IUserFileRepository fileRepository,
-            IUserSessionService userSessionService
+            IUserSessionService userSessionService,
+            IStorageService storageService
             )
         {
             _userFolderRepository = userFolderRepository;
             _fileService = fileService;
             _fileRepository = fileRepository;
             _userSessionService = userSessionService;
+            _storageService = storageService;
         }
 
         public async Task<FolderResponseDto> CreateFolderAsync(CreateFolderDto dto)
@@ -80,24 +83,27 @@ namespace CloudNext.Services
 
             var userKey = await _userSessionService.GetEncryptionKey(userId);
             if (string.IsNullOrEmpty(userKey))
-                throw new InvalidOperationException("Encryption key not found for the user.");
+                throw new InvalidOperationException("Encryption key not found.");
 
             var allFilesWithPaths = await CollectFilesRecursively(userId, rootFolder);
 
             using var zipMemoryStream = new MemoryStream();
+
             using (var archive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
             {
                 foreach (var (file, relativePath) in allFilesWithPaths)
                 {
-                    var fileSystemPath = Path.Combine(AppContext.BaseDirectory, file.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                    if (!File.Exists(fileSystemPath)) continue;
-
-                    var encryptedBytes = await File.ReadAllBytesAsync(fileSystemPath);
-                    var decryptedBytes = EncryptionHelper.DecryptFileBytes(encryptedBytes, userKey);
+                    using var encryptedStream =
+                        await _storageService.GetAsync(file.FilePath);
 
                     var zipEntry = archive.CreateEntry(relativePath, CompressionLevel.Fastest);
+
                     using var entryStream = zipEntry.Open();
-                    await entryStream.WriteAsync(decryptedBytes, 0, decryptedBytes.Length);
+
+                    await EncryptionHelper.DecryptToStreamAsync(
+                        encryptedStream,
+                        entryStream,
+                        userKey);
                 }
             }
 

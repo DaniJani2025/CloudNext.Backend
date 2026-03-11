@@ -49,62 +49,95 @@ namespace CloudNext.Utils
             return new string(keyChars);
         }
 
-        public async static Task GenerateThumbnail(byte[] fileBytes, string contentType, string thumbnailPath)
+        public static async Task<Stream?> GenerateThumbnailStreamAsync(
+            Stream inputStream,
+            string contentType)
         {
-            if (contentType.StartsWith("image/"))
+            if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
                 if (!Constants.Media.SupportedImageTypes.Contains(contentType.ToLower()))
-                    return;
+                    return null;
 
-                using var image = SixLabors.ImageSharp.Image.Load(fileBytes);
-                var thumbnail = image.Clone(ctx => ctx.Resize(new ResizeOptions
+                inputStream.Position = 0;
+
+                using var image = await SixLabors.ImageSharp.Image.LoadAsync(inputStream);
+
+                image.Mutate(ctx => ctx.Resize(new ResizeOptions
                 {
                     Mode = ResizeMode.Max,
                     Size = new Size(300, 300)
                 }));
-                thumbnail.Save(thumbnailPath);
+
+                var outputStream = new MemoryStream();
+                await image.SaveAsPngAsync(outputStream);
+                outputStream.Position = 0;
+
+                return outputStream;
             }
-            else if (contentType.StartsWith("video/"))
+
+            if (contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
             {
-                // strip any “; codecs=” suffix
                 var mediaType = contentType.Split(';')[0].Trim().ToLowerInvariant();
                 if (!Constants.Media.SupportedVideoTypes.Contains(mediaType))
-                    return;
+                    return null;
 
-                // write to temp file with correct extension
                 var ext = mediaType switch
                 {
                     "video/mp4" => ".mp4",
                     "video/avi" => ".avi",
-                    _ => Path.GetExtension(thumbnailPath)
+                    _ => ".mp4"
                 };
+
                 var tempVideoPath = Path.ChangeExtension(Path.GetTempFileName(), ext);
-                File.WriteAllBytes(tempVideoPath, fileBytes);
+                var tempThumbnailPath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
 
                 try
                 {
+                    using (var fileStream = new FileStream(
+                        tempVideoPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.None,
+                        81920,
+                        useAsync: true))
+                    {
+                        inputStream.Position = 0;
+                        await inputStream.CopyToAsync(fileStream);
+                    }
+
                     var startInfo = new ProcessStartInfo
                     {
-                        FileName = "ffmpeg",   // or full path
-                        Arguments = $"-hide_banner -loglevel error -i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{thumbnailPath}\" -y",
+                        FileName = "ffmpeg",
+                        Arguments = $"-hide_banner -loglevel error -i \"{tempVideoPath}\" -ss 00:00:01.000 -vframes 1 \"{tempThumbnailPath}\" -y",
                         RedirectStandardError = true,
                         UseShellExecute = false,
                         CreateNoWindow = true
                     };
 
                     using var process = Process.Start(startInfo)!;
-                    // read the single stderr stream so we don’t deadlock
                     var error = await process.StandardError.ReadToEndAsync();
-                    process.WaitForExit();
+                    await process.WaitForExitAsync();
 
                     if (process.ExitCode != 0)
                         throw new InvalidOperationException($"FFmpeg error (code {process.ExitCode}): {error}");
+
+                    var thumbnailStream = new MemoryStream(
+                        await File.ReadAllBytesAsync(tempThumbnailPath));
+
+                    thumbnailStream.Position = 0;
+                    return thumbnailStream;
                 }
                 finally
                 {
-                    File.Delete(tempVideoPath);
+                    if (File.Exists(tempVideoPath))
+                        File.Delete(tempVideoPath);
+
+                    if (File.Exists(tempThumbnailPath))
+                        File.Delete(tempThumbnailPath);
                 }
             }
+
+            return null;
         }
     }
 }

@@ -11,19 +11,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
+using Amazon.S3;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.WebHost.ConfigureKestrel((context, options) =>
-{
-    var certificatePath = context.Configuration["AppSettings:Certificate:Path"]!;
-    var certificatePassword = context.Configuration["AppSettings:Certificate:Password"]!;
-
-    options.ListenAnyIP(7245, listenOptions =>
-    {
-        listenOptions.UseHttps(new X509Certificate2(certificatePath, certificatePassword));
-    });
-});
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -64,8 +54,20 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IUserFileRepository, UserFileRepository>();
 builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<IUserFolderRepository, UserFolderRepository>();
-
 builder.Services.AddScoped<SMTPService>();
+
+var provider = builder.Configuration["Storage:Provider"];
+
+if (provider == "S3")
+{
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<IAmazonS3>();
+    builder.Services.AddScoped<IStorageService, S3StorageService>();
+}
+else
+{
+    builder.Services.AddScoped<IStorageService, LocalStorageService>();
+}
 
 builder.Services.AddHttpContextAccessor();
 
@@ -128,9 +130,11 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 if (app.Environment.IsDevelopment())
 {
-    app.UseStaticFiles();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -138,13 +142,17 @@ if (app.Environment.IsDevelopment())
         //c.InjectStylesheet("/swagger-dark.css");
     });
 }
+else
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
