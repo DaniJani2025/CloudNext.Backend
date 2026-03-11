@@ -49,27 +49,36 @@ namespace CloudNext.Utils
             return Convert.ToHexString(pbkdf2.GetBytes(keySize));
         }
 
-        public static byte[] EncryptFileBytes(byte[] fileBytes, string hexKey)
-        {
-            using var aes = Aes.Create();
-            aes.Key = Convert.FromHexString(hexKey);
-            aes.GenerateIV();
-
-            using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-            byte[] encryptedContent = encryptor.TransformFinalBlock(fileBytes, 0, fileBytes.Length);
-
-            byte[] result = new byte[aes.IV.Length + encryptedContent.Length];
-            Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-            Buffer.BlockCopy(encryptedContent, 0, result, aes.IV.Length, encryptedContent.Length);
-
-            return result;
-        }
-
-        public static byte[] DecryptFileBytes(byte[] fileBytes, string hexKey)
+        public static Stream CreateDecryptionReadStream(
+            Stream encryptedStream,
+            string hexKey)
         {
             var key = Convert.FromHexString(hexKey);
-            var iv = fileBytes.Take(16).ToArray();
-            var encryptedData = fileBytes.Skip(16).ToArray();
+
+            byte[] iv = new byte[16];
+            encryptedStream.Read(iv, 0, 16);
+
+            var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
+
+            return new CryptoStream(
+                encryptedStream,
+                aes.CreateDecryptor(),
+                CryptoStreamMode.Read);
+        }
+
+        public static async Task DecryptToStreamAsync(
+            Stream encryptedStream,
+            Stream outputStream,
+            string hexKey)
+        {
+            var key = Convert.FromHexString(hexKey);
+
+            byte[] iv = new byte[16];
+            await encryptedStream.ReadAsync(iv, 0, 16);
 
             using var aes = Aes.Create();
             aes.Key = key;
@@ -77,8 +86,13 @@ namespace CloudNext.Utils
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
 
-            using var decryptor = aes.CreateDecryptor();
-            return decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+            using var cryptoStream = new CryptoStream(
+                encryptedStream,
+                aes.CreateDecryptor(),
+                CryptoStreamMode.Read);
+
+            await cryptoStream.CopyToAsync(outputStream);
         }
     }
 }
+
