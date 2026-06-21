@@ -19,8 +19,8 @@ namespace CloudNext.Services
         public async Task SetSession(Guid userId, string key)
         {
             var context = _httpContextAccessor.HttpContext;
-            var ipAddress = context?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = context?.Request.Headers.UserAgent.ToString() ?? "unknown";
+            var ipAddress = context?.Connection.RemoteIpAddress?.ToString();
+            var userAgent = context?.Request.Headers.UserAgent.ToString();
 
             var session = new UserSession { Key = key, IP = ipAddress, Agent = userAgent };
             var json = JsonSerializer.Serialize(session);
